@@ -5,7 +5,7 @@ import { newId } from './util.js';
 
 // Cria um usuário de teste com o CNPJ de modelo informado pelo projeto.
 const cfg = loadConfig();
-const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir });
+const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir, schema: cfg.databaseSchema });
 const email = 'teste@fiscofacil.local';
 const { rows } = await db.query('select id from users where email = $1', [email]);
 let uid = rows[0]?.id as string | undefined;

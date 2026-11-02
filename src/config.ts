@@ -16,6 +16,7 @@ export interface Config {
   env: string;
   port: number;
   databaseUrl?: string;
+  databaseSchema?: string;
   dataDir: string;
   storageDir: string;
   jwtSecret: string;
@@ -40,6 +41,9 @@ type Env = Record<string, string | undefined>;
 export function loadConfig(env: Env = process.env): Config {
   const prod = env.NODE_ENV === 'production';
   const secret = env.JWT_SECRET?.trim() ?? '';
+  if (prod && !env.DATABASE_URL?.trim()) {
+    throw new Error('DATABASE_URL é obrigatório em produção (sem ele os dados se perderiam a cada reinício).');
+  }
   if (prod && secret.length < 32) {
     throw new Error('JWT_SECRET é obrigatório em produção e precisa ter 32 ou mais caracteres.');
   }
@@ -49,6 +53,7 @@ export function loadConfig(env: Env = process.env): Config {
     env: env.NODE_ENV ?? 'development',
     port: Number(env.PORT ?? 3000),
     databaseUrl: e('DATABASE_URL') || undefined,
+    databaseSchema: e('DATABASE_SCHEMA') || undefined,
     dataDir: e('DATA_DIR') || './data/pgdata',
     storageDir: e('STORAGE_DIR') || './data/arquivos',
     jwtSecret: secret || 'chave-somente-para-desenvolvimento-nao-use-em-producao',

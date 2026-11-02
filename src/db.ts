@@ -17,10 +17,18 @@ export interface Db {
  * Sem ela usa o PGlite, um PostgreSQL embutido que grava em dataDir (ou na memória se dataDir for vazio).
  * O SQL é o mesmo nos dois.
  */
-export async function createDb(opts: { databaseUrl?: string; dataDir?: string }): Promise<Db> {
+export async function createDb(opts: { databaseUrl?: string; dataDir?: string; schema?: string }): Promise<Db> {
   let db: Db;
   if (opts.databaseUrl) {
-    const pool = new pg.Pool({ connectionString: opts.databaseUrl });
+    // DATABASE_SCHEMA permite dividir um banco com outro sistema sem misturar as tabelas.
+    const schema = opts.schema && /^[a-z_][a-z0-9_]*$/.test(opts.schema) ? opts.schema : undefined;
+    if (schema) {
+      const c = new pg.Client({ connectionString: opts.databaseUrl });
+      await c.connect();
+      await c.query(`create schema if not exists ${schema}`);
+      await c.end();
+    }
+    const pool = new pg.Pool({ connectionString: opts.databaseUrl, ...(schema ? { options: `-c search_path=${schema}` } : {}) });
     db = {
       query: async (sql, params) => ({ rows: (await pool.query(sql, params as any[])).rows as any }),
       exec: async (sql) => { await pool.query(sql); },

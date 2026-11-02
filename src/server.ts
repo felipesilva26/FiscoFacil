@@ -11,7 +11,7 @@ import { atualizarCadastrosAntigos } from './services/situacao.js';
 import { importarPgfn } from './pgfn/importador.js';
 
 const cfg = loadConfig();
-const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir });
+const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir, schema: cfg.databaseSchema });
 const ctx: Ctx = {
   cfg, db, now: () => new Date(), fetchImpl: fetch,
   notifier: cfg.smtpUrl ? new SmtpNotifier(cfg.smtpUrl, cfg.mailFrom) : new ConsoleNotifier(),
