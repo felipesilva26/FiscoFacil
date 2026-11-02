@@ -15,7 +15,24 @@ async function api(method, url, body, isForm){
   if (!r.ok) { const er = new Error((j && j.erro) || ('Erro ' + r.status)); er.status = r.status; er.data = j; throw er; }
   return j;
 }
-function logout(){ token = ''; try { localStorage.removeItem(TK); } catch (e) {} showAuth('login'); }
+let SEM_LOGIN = false;
+function logout(){
+  token = ''; try { localStorage.removeItem(TK); } catch (e) {}
+  if (SEM_LOGIN) { S.empresas = []; entrarAnonimo().then(iniciar).catch(er => showAuth('login', er.message)); return; }
+  showAuth('login');
+}
+/** Versão de teste sem login: cria uma conta anônima ligada a este navegador. */
+async function entrarAnonimo(){
+  const id = (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^a-z0-9]/gi, '').slice(0, 20);
+  const r = await api('POST', '/api/auth/register', {nome:'Visitante', email:'visitante-' + id + '@fiscofacil.app', senha:id + '-' + Math.random().toString(36).slice(2)});
+  token = r.token; try { localStorage.setItem(TK, token); } catch (e) {}
+}
+async function boot(){
+  try { SEM_LOGIN = !!(await api('GET', '/api/health')).semLogin; } catch (e) {}
+  if (token) return iniciar();
+  if (SEM_LOGIN) { try { await entrarAnonimo(); return iniciar(); } catch (er) { showAuth('login', er.message); return; } }
+  showAuth('login');
+}
 
 async function loadAll(){
   const me = await api('GET', '/api/auth/me');
@@ -98,7 +115,10 @@ async function iniciar(){
     await loadAll();
     if (!S.empresas.length) { showAuth('primeira'); return; }
     hideAuth(); route(); renderAll();
-  } catch (er) { showAuth('login', er.message); }
+  } catch (er) {
+    if (SEM_LOGIN && !iniciar.tentou) { iniciar.tentou = true; token = ''; try { await entrarAnonimo(); return iniciar(); } catch (e2) { er = e2; } }
+    showAuth('login', er.message);
+  }
 }
 ACT['auth-troca'] = (el, e) => { if (e) e.preventDefault(); showAuth(el.dataset.modo); };
 ACT.sair = () => { logout(); };

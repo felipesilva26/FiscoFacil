@@ -52,14 +52,14 @@ sub("</style>", css + "\n</style>")
 # bloco "Dados do MVP" vira "Conta"
 a = s.index("const dados = sec('cd', 'Dados do MVP'")
 b = s.index("return head('Configurações'")
-s = s[:a] + "const dados = sec('cd', 'Conta', '<p class=\"sub\" style=\"margin:0 0 12px\">Conectado como <b>' + esc(S.user.email || '') + '</b>. Os dados ficam guardados no servidor.</p><button class=\"btn ghost\" data-action=\"sair\">Sair</button>');\n  " + s[b:]
+s = s[:a] + "const dados = sec('cd', 'Conta', '<p class=\"sub\" style=\"margin:0 0 12px\">' + (SEM_LOGIN ? 'Versão de teste, sem login: os dados ficam ligados a este navegador.' : 'Conectado como <b>' + esc(S.user.email || '') + '</b>. Os dados ficam guardados no servidor.') + '</p><button class=\"btn ghost\" data-action=\"sair\">' + (SEM_LOGIN ? 'Apagar e começar do zero' : 'Sair') + '</button>');\n  " + s[b:]
 # INTEG estática some: a página usa os dados do servidor
 a = s.index("const INTEG = [")
 b = s.index("function pgInteg(){")
 c = s.index("function pgCfg(){")
 s = s[:a] + "function pgInteg(){ return ''; }\n" + s[c:]
 # início: não carregar dados de exemplo, entrar pela tela de login
-sub("route();\nrenderAll();\n})();", layer + "\nroute();\nif (token) iniciar(); else showAuth('login');\n})();")
+sub("route();\nrenderAll();\n})();", layer + "\nroute();\nboot();\n})();")
 (root.parent / 'public').mkdir(exist_ok=True)
 (root.parent / 'public' / 'index.html').write_text(s)
 print('ok', len(s))

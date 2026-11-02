@@ -47,7 +47,7 @@ export async function buildApp(ctx: Ctx): Promise<FastifyInstance> {
 
   app.setNotFoundHandler((req, reply) => (req.url.startsWith('/api/') ? reply.code(404).send({ erro: 'Rota não encontrada.' }) : reply.code(404).send('Não encontrado')));
 
-  app.get('/api/health', async () => ({ ok: true, receita: ctx.receita.nome }));
+  app.get('/api/health', async () => ({ ok: true, receita: ctx.receita.nome, semLogin: ctx.cfg.semLogin }));
 
   await authRoutes(app, ctx);
   await empresasRoutes(app, ctx);

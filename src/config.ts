@@ -17,6 +17,8 @@ export interface Config {
   port: number;
   databaseUrl?: string;
   databaseSchema?: string;
+  /** Versão de teste: cada navegador ganha uma conta anônima, sem tela de login. */
+  semLogin: boolean;
   dataDir: string;
   storageDir: string;
   jwtSecret: string;
@@ -41,7 +43,7 @@ type Env = Record<string, string | undefined>;
 export function loadConfig(env: Env = process.env): Config {
   const prod = env.NODE_ENV === 'production';
   const secret = env.JWT_SECRET?.trim() ?? '';
-  if (prod && !env.DATABASE_URL?.trim()) {
+  if (prod && !env.DATABASE_URL?.trim() && env.PERMITIR_BANCO_TEMPORARIO !== '1') {
     throw new Error('DATABASE_URL é obrigatório em produção (sem ele os dados se perderiam a cada reinício).');
   }
   if (prod && secret.length < 32) {
@@ -54,6 +56,7 @@ export function loadConfig(env: Env = process.env): Config {
     port: Number(env.PORT ?? 3000),
     databaseUrl: e('DATABASE_URL') || undefined,
     databaseSchema: e('DATABASE_SCHEMA') || undefined,
+    semLogin: e('SEM_LOGIN') === '1',
     dataDir: e('DATA_DIR') || './data/pgdata',
     storageDir: e('STORAGE_DIR') || './data/arquivos',
     jwtSecret: secret || 'chave-somente-para-desenvolvimento-nao-use-em-producao',
