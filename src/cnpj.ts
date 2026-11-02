@@ -72,25 +72,41 @@ export interface LookupOptions {
   fetchImpl: typeof fetch;
   now?: Date;
   timeoutMs?: number;
+  log?: (msg: string) => void;
 }
 
 /**
  * Consulta de dados cadastrais (públicos) por CNPJ.
  * Não é a Receita direto: usa um espelho dos dados abertos (padrão: BrasilAPI). Não traz débitos.
  */
-export async function lookupCnpj(cnpj: string, o: LookupOptions): Promise<Cadastral> {
-  const d = onlyDigits(cnpj);
-  if (!validCnpj(d)) throw new CnpjError('CNPJ inválido. Confira os 14 números.', 400);
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), o.timeoutMs ?? 8000);
-  try {
-    const res = await o.fetchImpl(o.url.replace('{cnpj}', d), {
-      signal: ctl.signal,
-      headers: { accept: 'application/json' },
-    });
-    if (res.status === 404) throw new CnpjError('CNPJ não encontrado na base consultada.', 404);
-    if (!res.ok) throw new CnpjError(`A consulta cadastral falhou (HTTP ${res.status}).`, 502);
-    const j = (await res.json()) as Record<string, unknown>;
+/** Converte o formato do CNPJ.ws para o formato da BrasilAPI / Minha Receita. */
+function deCnpjWs(j: Record<string, any>): Record<string, unknown> {
+  const e = j.estabelecimento ?? {};
+  const sim = j.simples ?? {};
+  const sn = (v: unknown) => (typeof v === 'string' ? /^s/i.test(v) : null);
+  return {
+    razao_social: j.razao_social, nome_fantasia: e.nome_fantasia, descricao_situacao_cadastral: e.situacao_cadastral,
+    data_situacao_cadastral: e.data_situacao_cadastral, data_inicio_atividade: e.data_inicio_atividade,
+    descricao_matriz_filial: e.tipo, natureza_juridica: j.natureza_juridica?.descricao, descricao_porte: j.porte?.descricao,
+    capital_social: j.capital_social != null ? Number(j.capital_social) : undefined,
+    cnae_fiscal: e.atividade_principal?.id, cnae_fiscal_descricao: e.atividade_principal?.descricao,
+    cnaes_secundarias: (e.atividades_secundarias ?? []).map((x: { id?: string }) => ({ codigo: Number(x.id) || 0 })),
+    descricao_tipo_logradouro: e.tipo_logradouro, logradouro: e.logradouro, numero: e.numero, bairro: e.bairro, cep: e.cep,
+    municipio: e.cidade?.nome, uf: e.estado?.sigla,
+    opcao_pelo_simples: sn(sim.simples), data_opcao_pelo_simples: sim.data_opcao_simples, data_exclusao_do_simples: sim.data_exclusao_simples,
+    opcao_pelo_mei: sn(sim.mei), data_opcao_pelo_mei: sim.data_opcao_mei, data_exclusao_do_mei: sim.data_exclusao_mei,
+    situacao_especial: e.situacao_especial, qsa: j.socios ?? [],
+  };
+}
+
+function fonteDe(url: string): string {
+  const h = (() => { try { return new URL(url).hostname; } catch { return url; } })();
+  const nome = /brasilapi/.test(h) ? 'BrasilAPI' : /minhareceita/.test(h) ? 'Minha Receita' : /cnpj\.ws/.test(h) ? 'CNPJ.ws' : h;
+  return `Dados abertos da Receita Federal, via ${nome}`;
+}
+
+export function mapearCadastro(bruto: Record<string, unknown>, fonte: string, now?: Date): Cadastral {
+  const j = (bruto.estabelecimento ? deCnpjWs(bruto as Record<string, any>) : bruto) as Record<string, unknown>;
     const s = (k: string): string | undefined => (typeof j[k] === 'string' && (j[k] as string).trim() ? (j[k] as string).trim() : undefined);
     const b = (k: string): boolean | null => (typeof j[k] === 'boolean' ? (j[k] as boolean) : null);
     const data = (k: string): string | undefined => { const v = s(k); return v && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : undefined; };
@@ -121,17 +137,41 @@ export async function lookupCnpj(cnpj: string, o: LookupOptions): Promise<Cadast
       meiExclusao: data('data_exclusao_do_mei'),
       socios: Array.isArray(j.qsa) ? (j.qsa as unknown[]).length : 0,
       linhaDoTempo: [],
-      fonte: 'Dados abertos da Receita Federal, via BrasilAPI',
-      consultadoEm: (o.now ?? new Date()).toISOString(),
+      fonte,
+      consultadoEm: (now ?? new Date()).toISOString(),
     };
     cad.linhaDoTempo = linhaDoTempo(cad);
     return cad;
-  } catch (e) {
-    if (e instanceof CnpjError) throw e;
-    throw new CnpjError('Não foi possível consultar o CNPJ agora. Tente de novo mais tarde.', 502);
-  } finally {
-    clearTimeout(timer);
+}
+
+/**
+ * Consulta de dados cadastrais (públicos) por CNPJ.
+ * Não é a Receita direto: usa espelhos dos dados abertos. `url` aceita vários modelos separados por vírgula;
+ * se um falhar (fora do ar, bloqueio, limite de uso), tenta o próximo. Não traz débitos.
+ */
+export async function lookupCnpj(cnpj: string, o: LookupOptions): Promise<Cadastral> {
+  const d = onlyDigits(cnpj);
+  if (!validCnpj(d)) throw new CnpjError('CNPJ inválido. Confira os 14 números.', 400);
+  const modelos = o.url.split(',').map((u) => u.trim()).filter(Boolean);
+  let naoAchou = 0;
+  for (const modelo of modelos) {
+    const url = modelo.replace('{cnpj}', d);
+    try {
+      const res = await o.fetchImpl(url, {
+        signal: AbortSignal.timeout(o.timeoutMs ?? 8000),
+        headers: { accept: 'application/json', 'user-agent': 'FiscoFacil/1.0 (consulta cadastral de CNPJ)' },
+      });
+      if (res.status === 404) { naoAchou++; o.log?.(`consulta CNPJ: ${fonteDe(url)} respondeu 404`); continue; }
+      if (!res.ok) { o.log?.(`consulta CNPJ: ${fonteDe(url)} respondeu HTTP ${res.status}`); continue; }
+      const j = (await res.json()) as Record<string, unknown>;
+      if (!j || (!j.razao_social && !j.estabelecimento)) { o.log?.(`consulta CNPJ: ${fonteDe(url)} respondeu sem dados`); continue; }
+      return mapearCadastro(j, fonteDe(url), o.now);
+    } catch (e) {
+      o.log?.(`consulta CNPJ: ${fonteDe(url)} falhou: ${(e as Error).message}`);
+    }
   }
+  if (naoAchou && naoAchou === modelos.length) throw new CnpjError('CNPJ não encontrado na base pública da Receita.', 404);
+  throw new CnpjError('Não foi possível consultar o CNPJ agora. Tente de novo em instantes.', 502);
 }
 
 /** Monta a história da empresa a partir das datas do cadastro público. */

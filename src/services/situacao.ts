@@ -9,7 +9,7 @@ type Nivel = 'ok' | 'alerta' | 'pendente' | 'info';
 
 /** Consulta o cadastro público, guarda e avisa se algo importante mudou. */
 export async function atualizarCadastro(ctx: Ctx, e: Row): Promise<Cadastral> {
-  const novo = await lookupCnpj(e.cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now() });
+  const novo = await lookupCnpj(e.cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) });
   const antigo = (e.cadastral ?? null) as Cadastral | null;
   await ctx.db.query('update empresas set cadastral = $1 where id = $2', [JSON.stringify(novo), e.id]);
   if (antigo && antigo.situacao) {

@@ -28,6 +28,32 @@ describe('cadastro público', () => {
   });
 });
 
+describe('consulta cadastral com várias fontes', () => {
+  test('se a primeira fonte falha, usa a próxima; entende o formato do CNPJ.ws', async () => {
+    const vistos: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      vistos.push(url);
+      if (url.startsWith('https://a/')) return new Response('bloqueado', { status: 403 });
+      return new Response(JSON.stringify({ razao_social: 'EMPRESA WS LTDA', porte: { descricao: 'Micro Empresa' }, natureza_juridica: { descricao: 'Sociedade Limitada' },
+        simples: { simples: 'Sim', data_opcao_simples: '2020-01-01', mei: 'Não' },
+        estabelecimento: { situacao_cadastral: 'Ativa', data_inicio_atividade: '2020-01-01', atividade_principal: { id: '4751201', descricao: 'Comércio varejista de informática' },
+          cidade: { nome: 'Campinas' }, estado: { sigla: 'SP' }, atividades_secundarias: [{ id: '4752100' }] }, socios: [{}] }));
+    }) as unknown as typeof fetch;
+    const logs: string[] = [];
+    const c = await lookupCnpj(CNPJ_TESTE, { url: 'https://a/{cnpj}, https://publica.cnpj.ws/cnpj/{cnpj}', fetchImpl, log: (m) => logs.push(m) });
+    assert.equal(vistos.length, 2); assert.match(logs[0], /HTTP 403/);
+    assert.equal(c.razaoSocial, 'EMPRESA WS LTDA'); assert.equal(c.atividade, 'Comércio varejista de informática');
+    assert.equal(c.simples, true); assert.equal(c.mei, false); assert.equal(c.uf, 'SP'); assert.equal(c.porte, 'Micro Empresa');
+    assert.match(c.fonte, /CNPJ\.ws/);
+  });
+  test('404 em todas as fontes = não encontrado; erro em todas = indisponível', async () => {
+    const f404 = (async () => new Response('{}', { status: 404 })) as unknown as typeof fetch;
+    await assert.rejects(lookupCnpj(CNPJ_TESTE, { url: 'https://a/{cnpj},https://b/{cnpj}', fetchImpl: f404 }), (e: { status: number }) => e.status === 404);
+    const f500 = (async () => { throw new Error('rede'); }) as unknown as typeof fetch;
+    await assert.rejects(lookupCnpj(CNPJ_TESTE, { url: 'https://a/{cnpj}', fetchImpl: f500 }), (e: { status: number }) => e.status === 502);
+  });
+});
+
 describe('leitura da base da PGFN', () => {
   test('colunas pelo nome, aspas, valores e trimestres', async () => {
     const m = mapearColunas(['CPF_CNPJ', 'NÚMERO_INSCRIÇÃO', 'Valor Consolidado']);

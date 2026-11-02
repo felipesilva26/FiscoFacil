@@ -120,7 +120,7 @@ export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {
   app.get('/api/cnpj/:cnpj', { preHandler: guard, ...limite }, async (req, reply) => {
     const cnpj = (req.params as { cnpj: string }).cnpj;
     try {
-      return { cnpj: formatCnpj(cnpj), valido: true, cadastral: await lookupCnpj(cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now() }) };
+      return { cnpj: formatCnpj(cnpj), valido: true, cadastral: await lookupCnpj(cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) }) };
     } catch (e) {
       if (e instanceof CnpjError) {
         if (e.status === 400) return reply.code(400).send({ cnpj: formatCnpj(cnpj), valido: false, erro: e.message });
@@ -136,7 +136,7 @@ export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!e) return reply.code(404).send(naoAchou);
     if (!e.cnpj) return reply.code(409).send({ erro: 'Informe o CNPJ da empresa primeiro.' });
     try {
-      const cad = await lookupCnpj(e.cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now() });
+      const cad = await lookupCnpj(e.cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) });
       await ctx.db.query('update empresas set cadastral = $1 where id = $2', [JSON.stringify(cad), id]);
       return { cadastral: cad, nomeSugerido: cad.razaoSocial ?? null };
     } catch (err) {

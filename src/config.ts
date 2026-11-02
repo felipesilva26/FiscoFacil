@@ -65,7 +65,7 @@ export function loadConfig(env: Env = process.env): Config {
     mailFrom: e('MAIL_FROM') || 'FiscoFácil <nao-responder@localhost>',
     anthropicKey: e('ANTHROPIC_API_KEY') || undefined,
     assistantModel: e('ASSISTANT_MODEL') || 'claude-sonnet-5-5',
-    cnpjLookupUrl: e('CNPJ_LOOKUP_URL') || 'https://brasilapi.com.br/api/cnpj/v1/{cnpj}',
+    cnpjLookupUrl: e('CNPJ_LOOKUP_URL') || 'https://brasilapi.com.br/api/cnpj/v1/{cnpj},https://minhareceita.org/{cnpj},https://publica.cnpj.ws/cnpj/{cnpj}',
     receitaProvider: provider,
     pgfnBaseUrl: (e('PGFN_BASE_URL') || 'https://dadosabertos.pgfn.gov.br').replace(/\/$/, ''),
     pgfnTmpDir: e('PGFN_TMP_DIR') || './data/pgfn-tmp',

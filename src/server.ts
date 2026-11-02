@@ -1,4 +1,5 @@
 import { loadConfig } from './config.js';
+import { lookupCnpj } from './cnpj.js';
 import { buildApp } from './app.js';
 import { createDb } from './db.js';
 import type { Ctx } from './ctx.js';
@@ -38,3 +39,10 @@ process.on('SIGINT', parar);
 process.on('SIGTERM', parar);
 
 await app.listen({ port: cfg.port, host: '0.0.0.0' });
+
+// Diagnóstico ao iniciar: confere se cada fonte da consulta cadastral responde daqui do servidor.
+for (const modelo of cfg.cnpjLookupUrl.split(',').map((m) => m.trim()).filter(Boolean)) {
+  lookupCnpj('00000000000191', { url: modelo, fetchImpl: fetch, log: (m) => app.log.warn(m) })
+    .then((c) => app.log.info(`consulta CNPJ disponível: ${c.fonte}`))
+    .catch((e) => app.log.warn(`consulta CNPJ indisponível em ${modelo}: ${(e as Error).message}`));
+}
