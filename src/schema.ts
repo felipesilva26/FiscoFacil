@@ -114,4 +114,13 @@ create table if not exists alertas (
   lido boolean not null default false,
   criado_em timestamptz not null default now()
 );
+
+-- DAS-MEI: o que o dono informou sobre cada mês (enquanto não há conexão com a Receita).
+create table if not exists das_mei_status (
+  empresa_id text not null references empresas(id) on delete cascade,
+  competencia text not null,
+  status text not null,
+  marcado_em timestamptz not null default now(),
+  primary key (empresa_id, competencia)
+);
 `;

@@ -356,6 +356,14 @@ async function carregarSituacao(id, forcar){
 }
 ACT['sit-atualizar'] = rodar(async () => { delete SIT[S.empresaId]; renderMain(); await carregarSituacao(S.empresaId, true); toast(sitErro ? sitErro : 'Situação atualizada nas fontes oficiais.'); });
 ACT['sit-ir-autorizar'] = () => { const el = $('#autorizar'); if (el) el.closest('section').scrollIntoView({behavior:'smooth', block:'start'}); };
+const MESES_N = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const nomeComp = c => { const p = c.split('-'); return MESES_N[Number(p[1]) - 1] + '/' + p[0]; };
+ACT['das-mei'] = rodar(async el => {
+  const id = S.empresaId;
+  const r = await api('POST', '/api/empresas/' + id + '/das-mei', {competencia:el.dataset.c, status:el.dataset.s});
+  await loadAll(); SIT[id] = r; renderAll();
+  toast(el.dataset.s === 'pago' ? 'Marcado como pago.' : 'Guia em aberto criada. Você será avisado.');
+});
 const dataBR = s => s ? fmtDate(String(s).slice(0, 10)) : '';
 const reais = v => brl(Number(v) || 0);
 
@@ -401,6 +409,16 @@ function pgSituacao(){
     d.inscricoes.map(i => '<tr><td class="num">' + esc(i.numero) + '</td><td>' + esc(i.origem) + '</td><td>' + esc(i.receita || '') + '</td><td class="num money">' + reais(i.valor) + '</td><td>' + esc(i.situacao || '') + (i.ajuizado ? ' · ajuizada' : '') + '</td></tr>').join('') +
     '</tbody></table></div><p class="hint" style="margin-top:12px">Total: <b>' + reais(d.total) + '</b>. Fonte: ' + esc(d.fonte) + ', base do ' + esc(d.trimestre) + '. Para pagar ou parcelar, use o Regularize da PGFN.</p>') : '';
 
+  const meiSec = s.mei && s.mei.length ? sec('sm', 'DAS-MEI mês a mês',
+    '<p class="sub" style="margin:0 0 12px">A guia do MEI vence todo dia 20. Sem a conexão com a Receita, o sistema não sabe se você pagou: marque cada mês.</p>' +
+    '<ul class="meilist">' + s.mei.map(m => {
+      const chipM = m.status === 'pago' ? '<span class="chip pago"><i></i>Pago</span>' : m.status === 'nao_pago' ? '<span class="chip atrasado"><i></i>' + (m.vencida ? 'Não pago, atrasado' : 'Não pago') + '</span>' : m.vencida ? '<span class="chip neutro"><i></i>Confirme</span>' : '<span class="chip avencer"><i></i>A vencer</span>';
+      const bt = (st, txt, cls) => '<button class="btn ' + cls + ' sm" data-action="das-mei" data-c="' + m.competencia + '" data-s="' + st + '">' + txt + '</button>';
+      return '<li class="meirow"><div class="grow"><b>' + esc(nomeComp(m.competencia)) + '</b><small>Vence ' + dataBR(m.vencimento) + (m.valor ? ' · ' + reais(m.valor) + ' (valor da tabela)' : '') + '</small></div>' + chipM +
+        '<div class="meibtns">' + (m.status !== 'pago' ? bt('pago', 'Paguei', 'soft') : '') + (m.status !== 'nao_pago' ? bt('nao_pago', 'Não paguei', 'ghost') : '') + '</div></li>';
+    }).join('') + '</ul>' +
+    '<div class="actions" style="justify-content:flex-start;margin-top:14px"><a class="btn primary" href="https://www8.receita.fazenda.gov.br/simplesnacional/" target="_blank" rel="noopener">Conferir e pagar no PGMEI (site da Receita)</a></div>' +
+    '<p class="hint" style="margin-top:10px">No portal do Simples Nacional, entre em PGMEI. Use sempre o endereço receita.fazenda.gov.br: existem sites falsos de DAS. Se a guia vencer em feriado, pague no dia útil anterior.</p>') : '';
   const p = s.procuracao;
   const passos = sec('autorizar', 'Autorizar a consulta de tributos e guias', p.conectada
     ? '<p>Autorização registrada. As guias e pendências federais são consultadas no e-CAC automaticamente.</p>'
@@ -414,5 +432,5 @@ function pgSituacao(){
 
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação fiscal', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + passos + '</div><div class="stack">' + dados + linha + '</div></div>' + limites;
+    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + meiSec + lista + divida + passos + '</div><div class="stack">' + dados + linha + '</div></div>' + limites;
 }

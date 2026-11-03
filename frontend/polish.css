@@ -193,3 +193,11 @@ h1{letter-spacing:-.018em}
 .onbdl{margin:8px 0 0;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .onbrow{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px;font-size:13px}
 .onbrow dt{color:var(--muted)}.onbrow dd{margin:0;font-weight:600;color:var(--ink)}
+/* DAS-MEI mês a mês */
+.meilist{list-style:none;margin:0;padding:0}
+.meirow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px 14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.meirow:first-child{border-top:0;padding-top:0}
+.meirow b{text-transform:capitalize}
+.meirow small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.meibtns{display:flex;gap:8px;justify-content:flex-end}
+@container app (max-width:700px){.meirow{grid-template-columns:minmax(0,1fr) auto}.meibtns{grid-column:1/-1;justify-content:flex-start}}

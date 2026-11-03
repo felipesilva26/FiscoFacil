@@ -3,6 +3,8 @@ import { CnpjError } from '../cnpj.js';
 import type { Ctx } from '../ctx.js';
 import { empresaDoUsuario } from '../services/dominio.js';
 import { atualizarCadastro, situacaoFiscal } from '../services/situacao.js';
+import { ehMei, marcarDasMei } from '../services/dasmei.js';
+import { z } from 'zod';
 import { makeGuard } from './guard.js';
 
 export async function situacaoRoutes(app: FastifyInstance, ctx: Ctx) {
@@ -26,6 +28,16 @@ export async function situacaoRoutes(app: FastifyInstance, ctx: Ctx) {
       if (err instanceof CnpjError) return reply.code(err.status === 400 ? 400 : 502).send({ erro: err.message });
       throw err;
     }
+    return situacaoFiscal(ctx, (await empresaDoUsuario(ctx, req.userId, e.id))!);
+  });
+
+  /** O dono informa se pagou o DAS-MEI de um mês. */
+  app.post('/api/empresas/:id/das-mei', { preHandler: guard }, async (req, reply) => {
+    const e = await empresaDoUsuario(ctx, req.userId, (req.params as { id: string }).id);
+    if (!e) return reply.code(404).send(naoAchou);
+    if (!ehMei(e)) return reply.code(409).send({ erro: 'Esta empresa não está como MEI.' });
+    const b = z.object({ competencia: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Competência inválida.'), status: z.enum(['pago', 'nao_pago']) }).parse(req.body);
+    await marcarDasMei(ctx, e, b.competencia, b.status);
     return situacaoFiscal(ctx, (await empresaDoUsuario(ctx, req.userId, e.id))!);
   });
 

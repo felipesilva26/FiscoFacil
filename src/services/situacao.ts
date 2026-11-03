@@ -4,6 +4,7 @@ import type { Row } from '../db.js';
 import { dividaDoCnpj } from '../pgfn/importador.js';
 import { newId, todayISO, diffDays } from '../util.js';
 import { resumoEmpresa } from './dominio.js';
+import { competenciasMei, ehMei } from './dasmei.js';
 
 type Nivel = 'ok' | 'alerta' | 'pendente' | 'info';
 
@@ -61,16 +62,31 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
   const nivelCert: Nivel = !certidoes.length ? 'pendente' : certidoes.some((c) => !c.vencida) ? 'ok' : 'alerta';
 
   const guias = await resumoEmpresa(ctx, e.id);
-  const nivelGuias: Nivel = guias.atrasadas ? 'alerta' : 'ok';
+  const nivelGuias: Nivel = guias.atrasadas ? 'alerta' : guias.emAberto ? 'ok' : 'pendente';
 
+  const mei = ehMei(e) ? await competenciasMei(ctx, e) : null;
+  const meiVencidas = mei ? mei.filter((m) => m.vencida) : [];
+  const meiDevendo = meiVencidas.filter((m) => m.status === 'nao_pago');
+  const meiSemResposta = meiVencidas.filter((m) => m.status === 'nao_confirmado');
+  const blocoMei = mei ? [{
+    id: 'dasmei', titulo: 'DAS-MEI (guia mensal do MEI)',
+    nivel: (meiDevendo.length ? 'alerta' : meiSemResposta.length ? 'pendente' : 'ok') as Nivel,
+    texto: meiDevendo.length
+      ? `${meiDevendo.length} ${meiDevendo.length === 1 ? 'mês não pago' : 'meses não pagos'}: ${meiDevendo.map((m) => m.competencia.split('-').reverse().join('/')).join(', ')}.`
+      : meiSemResposta.length
+        ? `Confirme se pagou ${meiSemResposta.length === 1 ? 'o mês' : 'os meses'} ${meiSemResposta.map((m) => m.competencia.split('-').reverse().join('/')).join(', ')}. Sem a conexão com a Receita, o sistema não sabe.`
+        : 'Meses vencidos confirmados como pagos.',
+    fonte: 'Calendário oficial do DAS-MEI (vence dia 20); pagamento confirmado por você', atualizadoEm: null, automatico: false,
+  }] : [];
   const blocos = [
     { id: 'cadastro', titulo: 'Cadastro na Receita Federal', nivel: av.nivel as Nivel, texto: av.texto, fonte: cad?.fonte ?? 'Dados abertos da Receita Federal', atualizadoEm: cad?.consultadoEm ?? null, automatico: true },
     { id: 'divida', titulo: 'Dívida ativa da União e do FGTS', nivel: nivelDivida, texto: textoDivida, fonte: divida?.fonte ?? 'PGFN - dados abertos', atualizadoEm: divida?.trimestre ?? null, automatico: true },
+    ...blocoMei,
     { id: 'receita', titulo: 'Tributos federais, guias e pagamentos (e-CAC)', nivel: nivelReceita,
       texto: e.receita_conectada ? 'Conectado à Receita pelo Integra Contador.' : 'Precisa da sua autorização (procuração eletrônica no e-CAC).',
       fonte: 'Receita Federal, pelo Integra Contador (Serpro)', atualizadoEm: e.receita_ultima ? new Date(e.receita_ultima).toISOString() : null, automatico: receitaPronta },
-    { id: 'guias', titulo: 'Guias cadastradas no FiscoFácil', nivel: nivelGuias,
-      texto: guias.atrasadas ? `${guias.atrasadas} ${guias.atrasadas === 1 ? 'guia atrasada' : 'guias atrasadas'}.` : guias.emAberto ? `${guias.emAberto} em aberto, nenhuma atrasada.` : 'Nenhuma guia em aberto.',
+    { id: 'guias', titulo: 'Guias cadastradas por você', nivel: nivelGuias,
+      texto: guias.atrasadas ? `${guias.atrasadas} ${guias.atrasadas === 1 ? 'guia atrasada' : 'guias atrasadas'}.` : guias.emAberto ? `${guias.emAberto} em aberto, nenhuma atrasada.` : 'Nenhuma guia cadastrada. Sem a conexão com a Receita, o sistema só conhece as guias que você cadastra ou anexa.',
       fonte: 'Cadastradas por você ou lidas dos seus documentos', atualizadoEm: null, automatico: false },
     { id: 'certidoes', titulo: 'Estado e município (certidões)', nivel: nivelCert,
       texto: !certidoes.length ? 'Não há consulta automática nacional para ICMS e ISS. Anexe as certidões em Documentos.' : certidoes.some((c) => !c.vencida) ? 'Há certidão válida anexada.' : 'Todas as certidões anexadas estão vencidas.',
@@ -81,12 +97,12 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
   const resumo = alertas.length
     ? { nivel: 'alerta' as Nivel, titulo: alertas.length === 1 ? 'Há 1 ponto de atenção' : `Há ${alertas.length} pontos de atenção`, texto: alertas.map((b) => `${b.titulo}: ${b.texto}`).join(' ') }
     : pendentes.length
-      ? { nivel: 'info' as Nivel, titulo: 'Nada de errado encontrado até aqui', texto: `Ainda falta conferir: ${pendentes.map((b) => b.titulo).join('; ')}.` }
+      ? { nivel: 'info' as Nivel, titulo: 'Ainda não dá para dizer que está tudo em dia', texto: `Ainda falta conferir: ${pendentes.map((b) => b.titulo).join('; ')}.` }
       : { nivel: 'ok' as Nivel, titulo: 'Tudo em dia', texto: 'Nenhuma pendência nas fontes conferidas.' };
 
   return {
     empresa: { id: e.id, nome: e.nome, cnpj: e.cnpj },
-    resumo, blocos, cadastro: cad, divida, guias, certidoes,
+    resumo, blocos, cadastro: cad, divida, guias, certidoes, mei,
     procuracao: { conectada: !!e.receita_conectada, procuradorCnpj: ctx.cfg.procuradorCnpj || null, servicoConfigurado: receitaPronta },
     naoCobre: ['ICMS (cada estado tem o seu sistema)', 'ISS e taxas municipais (cada prefeitura tem o seu)', 'Débitos ainda não inscritos em dívida ativa, sem a procuração no e-CAC'],
   };
