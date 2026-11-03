@@ -201,3 +201,17 @@ h1{letter-spacing:-.018em}
 .meirow small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 .meibtns{display:flex;gap:8px;justify-content:flex-end}
 @container app (max-width:700px){.meirow{grid-template-columns:minmax(0,1fr) auto}.meibtns{grid-column:1/-1;justify-content:flex-start}}
+/* Atalhos para os sites oficiais */
+.sitrow{grid-template-columns:104px minmax(0,1fr)}
+.sitlinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sitlinks .btn .ic{margin-left:2px}
+.cnpjcopy{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);margin-bottom:12px}
+.cnpjcopy .num{font-weight:700;font-size:15px}
+.atalhos{list-style:none;margin:0;padding:0}
+.atalhos a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;min-height:52px}
+.atalhos li:first-child a{border-top:0}
+.atalhos a:hover b{color:var(--brand-text)}
+.atalhos b{display:block;font-size:14px}
+.atalhos small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.atalhos .ic{color:var(--muted);flex:none}
+@container app (max-width:700px){.sitrow{grid-template-columns:minmax(0,1fr)}}

@@ -534,6 +534,20 @@ h1{letter-spacing:-.018em}
 .meirow small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 .meibtns{display:flex;gap:8px;justify-content:flex-end}
 @container app (max-width:700px){.meirow{grid-template-columns:minmax(0,1fr) auto}.meibtns{grid-column:1/-1;justify-content:flex-start}}
+/* Atalhos para os sites oficiais */
+.sitrow{grid-template-columns:104px minmax(0,1fr)}
+.sitlinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sitlinks .btn .ic{margin-left:2px}
+.cnpjcopy{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);margin-bottom:12px}
+.cnpjcopy .num{font-weight:700;font-size:15px}
+.atalhos{list-style:none;margin:0;padding:0}
+.atalhos a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;min-height:52px}
+.atalhos li:first-child a{border-top:0}
+.atalhos a:hover b{color:var(--brand-text)}
+.atalhos b{display:block;font-size:14px}
+.atalhos small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.atalhos .ic{color:var(--muted);flex:none}
+@container app (max-width:700px){.sitrow{grid-template-columns:minmax(0,1fr)}}
 
 </style>
 
@@ -1542,6 +1556,38 @@ ACT['das-mei'] = rodar(async el => {
   await loadAll(); SIT[id] = r; renderAll();
   toast(el.dataset.s === 'pago' ? 'Marcado como pago.' : 'Guia em aberto criada. Você será avisado.');
 });
+/* Sites oficiais de cada assunto (endereços conferidos em fontes oficiais). */
+const OFICIAL = {
+  cnpj: {txt:'Comprovante do CNPJ', desc:'Receita Federal: situação cadastral e comprovante de inscrição', url:'https://solucoes.receita.fazenda.gov.br/servicos/cnpjreva/cnpjreva_solicitacao.asp'},
+  cnd: {txt:'Certidão federal', desc:'Receita Federal e PGFN: certidão de débitos federais', url:'https://servicos.receitafederal.gov.br/servico/certidoes/#/home'},
+  regularize: {txt:'Regularize (PGFN)', desc:'Dívida ativa da União e do FGTS: consultar, pagar e parcelar', url:'https://www.regularize.pgfn.gov.br/'},
+  pgmei: {txt:'PGMEI / Simples Nacional', desc:'Receita Federal: guia DAS-MEI e situação de cada mês', url:'https://www8.receita.fazenda.gov.br/simplesnacional/'},
+  ecac: {txt:'e-CAC', desc:'Receita Federal: pendências, pagamentos e procurações (gov.br)', url:'https://cav.receita.fazenda.gov.br/'},
+  crf: {txt:'Certidão do FGTS (CRF)', desc:'Caixa: certificado de regularidade do FGTS', url:'https://consultacrf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf'},
+  cndt: {txt:'Certidão trabalhista (CNDT)', desc:'TST: débitos trabalhistas', url:'https://cndt-certidao.tst.jus.br/inicio.faces'},
+};
+const busca = q => 'https://www.google.com/search?q=' + encodeURIComponent(q);
+function linksOficiais(s){
+  const c = s.cadastro || {}, uf = c.uf || '', mun = c.municipio || '';
+  const sefaz = {txt:'SEFAZ' + (uf ? ' ' + uf : ' do seu estado'), desc:'Certidão de débitos estaduais (ICMS)', url:busca('certidão negativa de débitos estaduais SEFAZ ' + uf + ' site:gov.br')};
+  const pref = {txt:'Prefeitura' + (mun ? ' de ' + mun.toLowerCase().replace(/(^|\s)(\S)/g, (x, a, b) => a + b.toUpperCase()).replace(/ (De|Do|Da|Dos|Das) /g, x => x.toLowerCase()) : ''), desc:'Certidão de débitos municipais (ISS e taxas)', url:busca('certidão negativa de débitos municipais prefeitura ' + mun + ' ' + uf)};
+  const divAlerta = s.blocos.some(b => b.id === 'divida' && b.nivel === 'alerta');
+  const receitaOk = s.blocos.some(b => b.id === 'receita' && b.nivel === 'ok');
+  return {
+    cadastro: [{txt:'Ver na Receita', url:OFICIAL.cnpj.url}],
+    divida: [{txt:divAlerta ? 'Negociar no Regularize' : 'Consultar no Regularize', url:OFICIAL.regularize.url}],
+    dasmei: [{txt:'Conferir e pagar no PGMEI', url:OFICIAL.pgmei.url}],
+    receita: [{txt:'Abrir o e-CAC', url:OFICIAL.ecac.url}].concat(receitaOk ? [] : [{txt:'Como autorizar', interno:true, acao:'sit-ir-autorizar'}]),
+    guias: [{txt:'Ver minhas guias', interno:true, url:'#guias'}],
+    certidoes: [{txt:'Certidão federal', url:OFICIAL.cnd.url}, {txt:'FGTS', url:OFICIAL.crf.url}, {txt:'Trabalhista', url:OFICIAL.cndt.url}, {txt:sefaz.txt, url:sefaz.url}, {txt:pref.txt, url:pref.url}, {txt:'Anexar certidão', interno:true, url:'#documentos'}],
+    todos: [OFICIAL.cnpj, OFICIAL.ecac, OFICIAL.pgmei, OFICIAL.regularize, OFICIAL.cnd, OFICIAL.crf, OFICIAL.cndt, sefaz, pref],
+  };
+}
+ACT['copiar-cnpj'] = el => {
+  const v = el.dataset.cnpj || '';
+  const ok = () => toast('CNPJ copiado. Cole no site do governo.');
+  try { navigator.clipboard.writeText(v).then(ok, () => toast('Copie manualmente: ' + v)); } catch (e) { toast('Copie manualmente: ' + v); }
+};
 const dataBR = s => s ? fmtDate(String(s).slice(0, 10)) : '';
 const reais = v => brl(Number(v) || 0);
 
@@ -1557,13 +1603,13 @@ function pgSituacao(){
   const veredito = '<section class="card sitverdict ' + v.nivel + '" aria-live="polite"><span class="sitvicon">' + icone + '</span><div><h2>' + esc(v.titulo) + '</h2><p>' + esc(v.texto) + '</p>' +
     (sitErro ? '<p class="err" style="margin-top:6px">' + esc(sitErro) + '</p>' : '') + '</div></section>';
 
-  const acao = b => b.id === 'divida' && b.nivel === 'alerta' ? '<a class="btn soft sm" href="https://www.regularize.pgfn.gov.br/" target="_blank" rel="noopener">Negociar no Regularize</a>'
-    : b.id === 'receita' && b.nivel !== 'ok' ? '<button class="btn soft sm" data-action="sit-ir-autorizar">Como autorizar</button>'
-    : b.id === 'certidoes' && b.nivel !== 'ok' ? '<a class="btn soft sm" href="#documentos">Anexar certidão</a>'
-    : b.id === 'guias' && b.nivel === 'alerta' ? '<a class="btn soft sm" href="#guias">Ver guias</a>' : '';
+  const L = linksOficiais(s);
+  const acao = b => (L[b.id] || []).map(l => l.interno
+      ? (l.acao ? '<button class="btn soft sm" data-action="' + l.acao + '">' + esc(l.txt) + '</button>' : '<a class="btn soft sm" href="' + l.url + '">' + esc(l.txt) + '</a>')
+      : '<a class="btn soft sm" href="' + l.url + '" target="_blank" rel="noopener">' + esc(l.txt) + ic('right', 14) + '</a>').join('');
   const blocos = s.blocos.map(b => { const n = NIVEL[b.nivel] || NIVEL.info;
     return '<li class="sitrow"><span class="chip ' + n[0] + '"><i></i>' + n[1] + '</span><div class="grow"><b>' + esc(b.titulo) + '</b><p>' + esc(b.texto) + '</p><small>Fonte: ' + esc(b.fonte) +
-      (b.atualizadoEm ? ' · ' + (/^\d{4}-/.test(b.atualizadoEm) ? 'consultado em ' + fmtDT(b.atualizadoEm) : 'base do ' + esc(b.atualizadoEm)) : '') + '</small></div>' + acao(b) + '</li>'; }).join('');
+      (b.atualizadoEm ? ' · ' + (/^\d{4}-/.test(b.atualizadoEm) ? 'consultado em ' + fmtDT(b.atualizadoEm) : 'base do ' + esc(b.atualizadoEm)) : '') + '</small>' + (acao(b) ? '<div class="sitlinks">' + acao(b) + '</div>' : '') + '</div></li>'; }).join('');
   const lista = sec('sb', 'O que foi conferido', '<ul class="sitlist">' + blocos + '</ul>');
 
   let dados = '';
@@ -1595,7 +1641,7 @@ function pgSituacao(){
       return '<li class="meirow"><div class="grow"><b>' + esc(nomeComp(m.competencia)) + '</b><small>Vence ' + dataBR(m.vencimento) + (m.valor ? ' · ' + reais(m.valor) + ' (valor da tabela)' : '') + '</small></div>' + chipM +
         '<div class="meibtns">' + (m.status !== 'pago' ? bt('pago', 'Paguei', 'soft') : '') + (m.status !== 'nao_pago' ? bt('nao_pago', 'Não paguei', 'ghost') : '') + '</div></li>';
     }).join('') + '</ul>' +
-    '<div class="actions" style="justify-content:flex-start;margin-top:14px"><a class="btn primary" href="https://www8.receita.fazenda.gov.br/simplesnacional/" target="_blank" rel="noopener">Conferir e pagar no PGMEI (site da Receita)</a></div>' +
+    '<div class="actions" style="justify-content:flex-start;margin-top:14px"><a class="btn primary" href="' + OFICIAL.pgmei.url + '" target="_blank" rel="noopener">Conferir e pagar no PGMEI (site da Receita)</a><button class="btn ghost" data-action="copiar-cnpj" data-cnpj="' + esc(fmtCnpj(e.cnpj || '')) + '">' + ic('copy', 16) + 'Copiar CNPJ</button></div>' +
     '<p class="hint" style="margin-top:10px">No portal do Simples Nacional, entre em PGMEI. Use sempre o endereço receita.fazenda.gov.br: existem sites falsos de DAS. Se a guia vencer em feriado, pague no dia útil anterior.</p>') : '';
   const p = s.procuracao;
   const passos = sec('autorizar', 'Autorizar a consulta de tributos e guias', p.conectada
@@ -1608,9 +1654,14 @@ function pgSituacao(){
       '<li class="step"><span class="sn">4</span><div><b>Volte aqui e conecte</b><p class="hint">' + (p.servicoConfigurado ? 'O sistema confere a autorização e passa a consultar sozinho.' : 'A consulta automática à Receita ainda está sendo contratada pelo FiscoFácil. Sua autorização fica pronta para quando ela for ligada.') + '</p></div></li>' +
       '</ol><div class="actions" style="justify-content:flex-start;margin-top:14px"><button class="btn primary" data-action="conectar" data-emp="' + e.id + '">' + ic('plug', 18) + 'Já autorizei, conectar</button></div>');
 
+  const cnpjF = fmtCnpj(e.cnpj || '');
+  const atalhos = sec('sa', 'Atalhos oficiais', '<p class="sub" style="margin:0 0 12px">Sites do governo para conferir, emitir guias e tirar certidões. Os sites pedem o CNPJ: copie aqui e cole lá.</p>' +
+    '<div class="cnpjcopy"><span class="num">' + esc(cnpjF) + '</span><button class="btn ghost sm" data-action="copiar-cnpj" data-cnpj="' + esc(cnpjF) + '">' + ic('copy', 16) + 'Copiar CNPJ</button></div>' +
+    '<ul class="atalhos">' + L.todos.map(l => '<li><a href="' + l.url + '" target="_blank" rel="noopener"><span><b>' + esc(l.txt) + '</b><small>' + esc(l.desc) + '</small></span>' + ic('right', 16) + '</a></li>').join('') + '</ul>' +
+    '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação fiscal', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + meiSec + lista + divida + passos + '</div><div class="stack">' + dados + linha + '</div></div>' + limites;
+    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + meiSec + lista + divida + passos + '</div><div class="stack">' + dados + atalhos + linha + '</div></div>' + limites;
 }
 
 route();
