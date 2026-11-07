@@ -96,6 +96,12 @@ export async function filtrarCsv(stream: Readable, procurados: Set<string>): Pro
       return;
     }
     linhas++;
+    if (linhas % 2_000_000 === 0) console.log(`PGFN: ${linhas.toLocaleString('pt-BR')} linhas lidas`);
+    // Caminho rápido: quase nenhuma linha interessa, então só olha a coluna do CNPJ.
+    if (cab.cnpj === 0 && l.charCodeAt(0) !== 34) {
+      const fim = l.indexOf(sep);
+      if (!procurados.has(onlyDigits(fim < 0 ? l : l.slice(0, fim)))) return;
+    }
     const c = dividir(l, sep);
     const cnpj = onlyDigits(c[cab.cnpj]);
     if (!procurados.has(cnpj)) return;
@@ -229,7 +235,8 @@ export async function importarPgfn(ctx: Ctx, opts: { forcar?: boolean } = {}): P
     if (!opts.forcar && !faltam.length) continue;
 
     {
-      const r = await ctx.fetchImpl(url, { signal: AbortSignal.timeout(2 * 60 * 60 * 1000) });
+      console.log(`PGFN: baixando ${url} para conferir ${procurados.size} CNPJ(s)`);
+      const r = await ctx.fetchImpl(url, { signal: AbortSignal.timeout(4 * 60 * 60 * 1000) });
       if (!r.ok || !r.body) throw new Error(`Download falhou (HTTP ${r.status}): ${url}`);
       let lido: { linhas: number; achados: Inscricao[] };
       try {
