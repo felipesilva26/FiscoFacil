@@ -1,5 +1,6 @@
 import { loadConfig } from './config.js';
 import { lookupCnpj } from './cnpj.js';
+import { lerCertificado } from './receita/certificado.js';
 import { buildApp } from './app.js';
 import { createDb } from './db.js';
 import type { Ctx } from './ctx.js';
@@ -46,4 +47,14 @@ for (const modelo of cfg.cnpjLookupUrl.split(',').map((m) => m.trim()).filter(Bo
   lookupCnpj('00000000000191', { url: modelo, fetchImpl: fetch, log: (m) => app.log.warn(m) })
     .then((c) => app.log.info(`consulta CNPJ disponível: ${c.fonte}`))
     .catch((e) => app.log.warn(`consulta CNPJ indisponível em ${modelo}: ${(e as Error).message}`));
+}
+
+// Confere o certificado e-CNPJ, se configurado (só titular, CNPJ e validade vão para o log).
+if (cfg.serpro.certPfxPath) {
+  try {
+    const c = lerCertificado(cfg.serpro.certPfxPath, cfg.serpro.certPassword);
+    app.log.info(`Certificado e-CNPJ OK: ${c.titular} (CNPJ ${c.cnpj ?? 'não identificado'}), emitido por ${c.emissor}, válido até ${c.validoAte.slice(0, 10)} (${c.diasRestantes} dias)${c.vencido ? ' - VENCIDO' : ''}`);
+  } catch (e) {
+    app.log.warn(`Certificado e-CNPJ com problema: ${(e as Error).message}`);
+  }
 }
