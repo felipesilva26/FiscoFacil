@@ -241,3 +241,14 @@ h1{letter-spacing:-.018em}
 .seg button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand-text)}
 @media (pointer:coarse){.seg button{min-height:44px}}
 .tabbar{grid-template-columns:repeat(5,minmax(0,1fr))}
+
+/* Notas fiscais e limite do MEI */
+.meibar{margin-top:14px}
+.meibar-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}
+.meibar-trilho{height:10px;border-radius:99px;background:var(--line,#e5e7eb);overflow:hidden;margin-top:8px}
+.meibar-trilho i{display:block;height:100%;border-radius:99px;background:var(--ok,#15803d);transition:width .4s}
+.meibar.warn .meibar-trilho i{background:var(--warn,#b45309)}
+.meibar.bad .meibar-trilho i{background:var(--bad,#b91c1c)}
+.notas .sechead{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.notas .sechead h2{margin:0}
+.nowrap{white-space:nowrap}

@@ -13,6 +13,7 @@ import { extrasRoutes } from './routes/extras.js';
 import { mensagemDeErro } from './routes/guard.js';
 import { obrigacoesRoutes } from './routes/obrigacoes.js';
 import { situacaoRoutes } from './routes/situacao.js';
+import { notasRoutes } from './routes/notas.js';
 import { CnpjError } from './cnpj.js';
 import { ReceitaNaoConfigurada } from './receita/provider.js';
 
@@ -55,6 +56,7 @@ export async function buildApp(ctx: Ctx): Promise<FastifyInstance> {
   await documentosRoutes(app, ctx);
   await extrasRoutes(app, ctx);
   await situacaoRoutes(app, ctx);
+  await notasRoutes(app, ctx);
 
   // Tela do FiscoFácil servida pelo próprio backend (mesma origem, sem CORS).
   const pub = resolve(process.cwd(), 'public');

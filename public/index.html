@@ -575,6 +575,17 @@ h1{letter-spacing:-.018em}
 @media (pointer:coarse){.seg button{min-height:44px}}
 .tabbar{grid-template-columns:repeat(5,minmax(0,1fr))}
 
+/* Notas fiscais e limite do MEI */
+.meibar{margin-top:14px}
+.meibar-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}
+.meibar-trilho{height:10px;border-radius:99px;background:var(--line,#e5e7eb);overflow:hidden;margin-top:8px}
+.meibar-trilho i{display:block;height:100%;border-radius:99px;background:var(--ok,#15803d);transition:width .4s}
+.meibar.warn .meibar-trilho i{background:var(--warn,#b45309)}
+.meibar.bad .meibar-trilho i{background:var(--bad,#b91c1c)}
+.notas .sechead{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.notas .sechead h2{margin:0}
+.nowrap{white-space:nowrap}
+
 </style>
 
 <div class="frame" id="frame">
@@ -1261,6 +1272,7 @@ async function loadAll(){
   let alertas = []; try { alertas = await api('GET', '/api/alertas'); } catch (e) {}
   const obrigacoes = [], docs = [];
   for (const e of emps) {
+    try { NOTAS[e.id] = await api('GET', '/api/empresas/' + e.id + '/notas'); } catch (er) { NOTAS[e.id] = null; }
     const r = await Promise.all([api('GET', '/api/empresas/' + e.id + '/obrigacoes'), api('GET', '/api/empresas/' + e.id + '/obrigacoes?arquivadas=true'), api('GET', '/api/empresas/' + e.id + '/documentos')]);
     r[0].concat(r[1]).forEach(o => obrigacoes.push(o));
     r[2].forEach(x => docs.push({id:x.id, empresaId:x.empresaId, nome:x.nome, tipo:x.tipo, tam:x.tamanho, data:x.data, validade:x.validade}));
@@ -1426,6 +1438,16 @@ const SUB = {
       await api('POST', '/api/obrigacoes/' + sel.value + '/pagar', {data:$('#ldata').value || iso(today()), comprovante:lerFile.name});
       await enviar(S.empresaId, lerFile, 'Comprovante');
       await refresh('Pagamento registrado e comprovante guardado.');
+    } else if (k === 'nota') {
+      const n = L.nota, data = $('#ndata').value, valor = parseMoney($('#nfvalor').value), dir = $('#ndir').value;
+      if (!data) throw new Error('Informe a data de emissão.');
+      if (!(valor > 0)) throw new Error('Informe um valor maior que zero.');
+      const doc = await enviar(S.empresaId, lerFile, 'Nota fiscal');
+      const outra = dir === 'recebida' ? n.emitente : n.destinatario;
+      const imp = {}; Object.keys(n.impostos || {}).forEach(x => { if (n.impostos[x] != null) imp[x] = n.impostos[x]; });
+      await api('POST', '/api/empresas/' + S.empresaId + '/notas', {documentoId:doc.id, tipo:n.tipo, chave:n.chave, numero:n.numero, serie:n.serie, dataEmissao:data, direcao:dir,
+        contraparteDoc:outra && outra.doc, contraparteNome:outra && outra.nome, valor:Math.round(valor * 100) / 100, impostos:imp});
+      await refresh(dir === 'emitida' ? 'Venda registrada no faturamento.' : 'Compra registrada.');
     } else {
       const v = $('#lval').value;
       if (!v) throw new Error('Informe até quando a certidão é válida.');
@@ -1476,9 +1498,12 @@ async function enviar(empresaId, file, tipo, validade){
   const fd = new FormData(); fd.append('file', file, file.name);
   return api('POST', '/api/empresas/' + empresaId + '/documentos?tipo=' + encodeURIComponent(tipo) + (validade ? '&validade=' + validade : ''), fd, true);
 }
+const NOTAS = {};
 let lerFile = null;
 addFiles = async function(files, tipo){
   const arr = Array.prototype.slice.call(files);
+  const xmls = arr.filter(f => /\.xml$/i.test(f.name));
+  if (xmls.length && xmls.length === arr.length) return importarXmls(xmls);
   if (arr.length === 1 && /\.pdf$/i.test(arr[0].name)) {
     try {
       const fd = new FormData(); fd.append('file', arr[0], arr[0].name);
@@ -1492,7 +1517,8 @@ addFiles = async function(files, tipo){
   try { for (const f of arr) { await enviar(S.empresaId, f, tipo); n++; } } catch (er) { falhou(er); }
   if (n) await refresh(n + (n === 1 ? ' documento enviado.' : ' documentos enviados.')); else renderMain();
 };
-const TIPO_DOC = {guia:'Guia', comprovante:'Comprovante', certidao:'Certidão'};
+const TIPO_DOC = {guia:'Guia', comprovante:'Comprovante', certidao:'Certidão', nota:'Nota fiscal'};
+const fmtDoc = d => d && d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d && d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (d || '');
 const num2br = v => v == null ? '' : String(v.toFixed(2)).replace('.', ',');
 function drawLer(){
   const m = ui.modal, r = m.r, L = r.leitura, box = $('#modal');
@@ -1515,6 +1541,15 @@ function drawLer(){
       (c.length ? '<div class="field"><label>Marcar qual obrigação como paga?</label>' + c.map((o, i) => '<label class="check"><input type="radio" name="lcand" value="' + o.id + '"' + (i === 0 ? ' checked' : '') + '> ' + esc(TRIB[o.tributo] || o.tributo) + ', vence ' + fmtDate(o.venc) + ', ' + brl(o.valor) + '</label>').join('') + '</div>' +
         field('ldata', 'Data do pagamento', '<input id="ldata" type="date" class="in" value="' + esc(L.dataPagamento || iso(today())) + '">')
         : '<p class="hint" style="margin:0">Não achei uma obrigação em aberto com esse valor. Você pode guardar só o arquivo.</p>') + botoes(c.length ? 'Marcar como paga e guardar' : '');
+  } else if (L.tipo === 'nota') {
+    const n = L.nota, outra = n.direcao === 'recebida' ? n.emitente : n.destinatario;
+    title = 'Li uma nota fiscal';
+    body = '<form id="formLer" class="form" data-k="nota"><p class="sub" style="margin:0">' + esc(n.tipo) + (n.numero ? ' nº ' + esc(n.numero) : '') + ' · arquivo <b>' + esc(lerFile.name) + '</b>' +
+      (outra && (outra.nome || outra.doc) ? '<br>' + (n.direcao === 'recebida' ? 'Fornecedor: ' : 'Cliente: ') + (outra.nome ? esc(outra.nome) + (outra.doc ? ' (' + esc(fmtDoc(outra.doc)) + ')' : '') : esc(fmtDoc(outra.doc))) : '') + '</p>' +
+      avisos.replace('Já existe uma obrigação igual cadastrada.', 'Esta nota já foi registrada antes.') +
+      field('ndir', 'Esta nota é', '<select id="ndir" class="in"><option value="emitida"' + (n.direcao !== 'recebida' ? ' selected' : '') + '>Uma venda (emitida pela empresa)</option><option value="recebida"' + (n.direcao === 'recebida' ? ' selected' : '') + '>Uma compra (recebida de fornecedor)</option></select>', n.direcao === 'outra' ? 'Não achei o CNPJ da empresa na nota. Escolha você.' : 'Vendas contam no faturamento.') +
+      '<div class="formrow">' + field('ndata', 'Data de emissão', '<input id="ndata" type="date" class="in" value="' + esc(n.dataEmissao || '') + '">') +
+      field('nfvalor', 'Valor total (R$)', '<input id="nfvalor" class="in" inputmode="decimal" value="' + esc(num2br(n.valor)) + '">') + '</div>' + botoes(r.duplicada ? '' : 'Registrar nota e guardar');
   } else {
     title = 'Li uma certidão';
     const sit = {negativa:'Negativa (sem débitos)', positiva_com_efeitos_de_negativa:'Positiva com efeitos de negativa', positiva:'Positiva (há débitos)'}[L.situacaoCertidao] || '';
@@ -1759,6 +1794,59 @@ renderTab = function(){
   if (!S.empresas.length) return;
   const tabs = [['inicio','Início','home'], ['guias','Guias','wallet'], ['documentos','Documentos','folder'], ['empresas','Empresas','building'], ['configuracoes','Ajustes','gear']];
   $('#tabbar').innerHTML = tabs.map(n => '<a href="#' + n[0] + '"' + (ui.page === n[0] ? ' aria-current="page"' : '') + '>' + ic(n[2], 22) + n[1] + '</a>').join('');
+};
+
+/* ---------- Notas fiscais: XML em lote, resumo e limite do MEI ---------- */
+async function importarXmls(files){
+  let novas = 0, repetidas = 0; const erros = [];
+  toast('Lendo ' + files.length + (files.length === 1 ? ' nota...' : ' notas...'));
+  for (const f of files) {
+    try {
+      const fd = new FormData(); fd.append('file', f, f.name);
+      const r = await api('POST', '/api/empresas/' + S.empresaId + '/notas/importar', fd, true);
+      if (r.repetida) repetidas++; else novas++;
+    } catch (er) { erros.push(er.message); }
+  }
+  const partes = [];
+  if (novas) partes.push(novas + (novas === 1 ? ' nota registrada' : ' notas registradas'));
+  if (repetidas) partes.push(repetidas + (repetidas === 1 ? ' já estava no sistema' : ' já estavam no sistema'));
+  if (erros.length) partes.push(erros.length + (erros.length === 1 ? ' não lida: ' : ' não lidas: ') + erros[0]);
+  await refresh(partes.join('. ') + '.');
+}
+ACT.rmnota = rodar(async el => { await api('DELETE', '/api/notas/' + el.dataset.id); await refresh('Nota removida do faturamento.'); });
+function barraMei(m, compacto){
+  if (!m) return '';
+  const pct = Math.min(100, m.percentual), tom = m.situacao === 'ok' ? 'ok' : m.situacao === 'perto' ? 'warn' : 'bad';
+  const txt = {ok:'Dentro do limite.', perto:'Perto do limite: acima de 80%.', acima:'Passou do limite (até 20%): vai pagar DAS sobre o excesso e deixa de ser MEI no ano que vem.', acima20:'Passou mais de 20% do limite: o desenquadramento do MEI é retroativo a janeiro. Fale com um contador.'}[m.situacao];
+  return '<div class="meibar ' + tom + '"><div class="meibar-top"><span>Faturamento do MEI em ' + NOTAS[S.empresaId].ano + '</span><b>' + brl(m.usado) + ' de ' + brl(m.limite) + '</b></div>' +
+    '<div class="meibar-trilho" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(pct) + '" aria-label="Uso do limite do MEI"><i style="width:' + pct + '%"></i></div>' +
+    '<p class="hint" style="margin:6px 0 0">' + String(m.percentual).replace('.', ',') + '% usado · ' + (m.restante >= 0 ? 'faltam ' + brl(m.restante) : 'passou ' + brl(-m.restante)) + '. ' + txt +
+    (m.meses < 12 ? ' Limite proporcional: ' + m.meses + ' meses no ano de abertura.' : '') + (compacto ? '' : ' Conta só as notas de venda registradas aqui.') + '</p></div>';
+}
+function secaoNotas(){
+  const N = NOTAS[S.empresaId];
+  if (!N) return '';
+  const R = N.resumo, mesNome = MESES[today().getMonth()].toLowerCase();
+  const lista = N.notas.slice(0, 8).map(n => '<div class="docrow"><span class="docicon">' + ic(n.direcao === 'emitida' ? 'chart' : 'wallet') + '</span><div class="grow"><div class="nm">' + esc(n.tipo) + (n.numero ? ' nº ' + esc(n.numero) : '') + ' · ' + esc(n.contraparteNome || fmtDoc(n.contraparteDoc) || (n.direcao === 'emitida' ? 'Venda' : 'Compra')) + '</div><div class="mt">' + (n.direcao === 'emitida' ? 'Venda' : 'Compra') + ' · ' + fmtDate(n.dataEmissao) + '</div></div><b class="nowrap">' + brl(n.valor) + '</b><button class="ib" data-action="rmnota" data-id="' + n.id + '" aria-label="Remover nota">' + ic('trash', 18) + '</button></div>').join('');
+  return '<section class="card notas" aria-label="Notas fiscais" style="margin-bottom:20px"><div class="sechead"><h2>Notas fiscais</h2><span class="hint">Envie o XML (melhor) ou o PDF da nota. Vários XML de uma vez também funcionam.</span></div>' +
+    '<div class="kpis kpis3"><div class="card kpi"><span class="kicon ok">' + ic('chart', 24) + '</span><div><div class="klabel">Vendas em ' + mesNome + '</div><div class="kval">' + brl(R.emitidas.mes) + '</div></div></div>' +
+    '<div class="card kpi"><span class="kicon brand">' + ic('calendar', 24) + '</span><div><div class="klabel">Vendas em ' + N.ano + '</div><div class="ksub">' + R.emitidas.qtd + (R.emitidas.qtd === 1 ? ' nota' : ' notas') + '</div><div class="kval">' + brl(R.emitidas.total) + '</div></div></div>' +
+    '<div class="card kpi"><span class="kicon neutro">' + ic('wallet', 24) + '</span><div><div class="klabel">Compras em ' + N.ano + '</div><div class="ksub">' + R.recebidas.qtd + (R.recebidas.qtd === 1 ? ' nota' : ' notas') + '</div><div class="kval">' + brl(R.recebidas.total) + '</div></div></div></div>' +
+    barraMei(N.mei) + (lista ? '<div style="margin-top:14px">' + lista + '</div>' : '<p class="hint" style="margin-top:12px">Nenhuma nota registrada ainda.</p>') + '</section>';
+}
+const _rmNotas = renderMain;
+renderMain = function(){
+  _rmNotas();
+  if (!S.empresas.length) return;
+  if (ui.page === 'documentos') {
+    const ph = $('#main .pagehead'); if (ph) ph.insertAdjacentHTML('afterend', secaoNotas());
+    const nota = $('#main .note'); if (nota) nota.textContent = 'Os arquivos ficam guardados no servidor. Guias, comprovantes, certidões e notas fiscais (PDF ou XML) são lidos automaticamente.';
+    const inp = $('#fileDoc'); if (inp) inp.setAttribute('accept', '.pdf,.xml,.png,.jpg,.jpeg,.csv,.txt,.xlsx');
+  }
+  if (ui.page === 'inicio') {
+    const N = NOTAS[S.empresaId], k = $('#main .kpis3');
+    if (N && N.mei && k) k.insertAdjacentHTML('afterend', '<section class="card" style="margin-top:16px">' + barraMei(N.mei, true) + '</section>');
+  }
 };
 
 route();

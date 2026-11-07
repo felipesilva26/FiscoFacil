@@ -123,4 +123,23 @@ create table if not exists das_mei_status (
   marcado_em timestamptz not null default now(),
   primary key (empresa_id, competencia)
 );
+
+-- Notas fiscais lidas dos documentos (emitidas = faturamento; recebidas = compras).
+create table if not exists notas_fiscais (
+  id text primary key,
+  empresa_id text not null references empresas(id) on delete cascade,
+  documento_id text references documentos(id) on delete set null,
+  tipo text not null,
+  chave text,
+  numero text,
+  serie text,
+  data_emissao text not null,
+  direcao text not null,
+  contraparte_doc text,
+  contraparte_nome text,
+  valor_centavos bigint not null,
+  impostos jsonb not null default '{}',
+  criado_em timestamptz not null default now()
+);
+create unique index if not exists notas_chave_unica on notas_fiscais (empresa_id, chave) where chave is not null;
 `;

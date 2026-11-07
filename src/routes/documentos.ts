@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Ctx } from '../ctx.js';
 import { auditar, empresaDoUsuario } from '../services/dominio.js';
 import { lerDocumento } from '../services/leitor.js';
+import { lerNotaTexto, lerNotaXml, pareceTextoDeNota, pareceXmlDeNota } from '../services/notafiscal.js';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { isISODate, newId, todayISO } from '../util.js';
 import { makeGuard } from './guard.js';
@@ -74,7 +75,16 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!parte) return reply.code(400).send({ erro: 'Envie um arquivo no campo "file".' });
     const buf = await parte.toBuffer();
     if (parte.file.truncated) return reply.code(413).send({ erro: 'Arquivo acima de 10 MB.' });
-    if (!MAGIC.pdf.every((b, i) => buf[i] === b)) return reply.code(415).send({ erro: 'A leitura automática funciona só com PDF.' });
+    const nomeArq = (parte.filename || '').toLowerCase();
+    if (nomeArq.endsWith('.xml') || buf.subarray(0, 200).toString('utf8').trimStart().startsWith('<')) {
+      const xml = buf.toString('utf8');
+      if (!pareceXmlDeNota(xml)) return reply.code(422).send({ erro: 'Este XML não é de nota fiscal (NF-e, NFC-e ou NFS-e).' });
+      const nota = lerNotaXml(xml, e.cnpj);
+      const repetida = nota.chave ? (await ctx.db.query('select id from notas_fiscais where empresa_id = $1 and chave = $2', [id, nota.chave])).rows.length > 0 : false;
+      await auditar(ctx, req.userId, id, 'documento.ler', { tipo: 'nota', origem: 'xml' });
+      return { leitura: { tipo: 'nota', nota, avisos: nota.avisos, confianca: nota.confianca }, candidatos: [], duplicada: repetida, hoje: todayISO(ctx.now()) };
+    }
+    if (!MAGIC.pdf.every((b, i) => buf[i] === b)) return reply.code(415).send({ erro: 'A leitura automática funciona com PDF e com XML de nota fiscal.' });
     let texto = '';
     try {
       const pdf = await getDocumentProxy(new Uint8Array(buf));
@@ -84,6 +94,12 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
     }
     if (texto.replace(/\s/g, '').length < 20) {
       return reply.code(422).send({ erro: 'Este PDF não tem texto (parece digitalizado). Ainda não leio imagens: cadastre manualmente.' });
+    }
+    if (pareceTextoDeNota(texto)) {
+      const nota = lerNotaTexto(texto, e.cnpj);
+      const repetida = nota.chave ? (await ctx.db.query('select id from notas_fiscais where empresa_id = $1 and chave = $2', [id, nota.chave])).rows.length > 0 : false;
+      await auditar(ctx, req.userId, id, 'documento.ler', { tipo: 'nota', origem: 'pdf' });
+      return { leitura: { tipo: 'nota', nota, avisos: nota.avisos, confianca: nota.confianca }, candidatos: [], duplicada: repetida, hoje: todayISO(ctx.now()) };
     }
     const leitura = lerDocumento(texto, e.cnpj);
     const hoje = todayISO(ctx.now());
