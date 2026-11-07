@@ -29,6 +29,7 @@ async function entrarAnonimo(){
 }
 async function boot(){
   try { SEM_LOGIN = !!(await api('GET', '/api/health')).semLogin; } catch (e) {}
+  document.body.classList.toggle('semlogin', SEM_LOGIN);
   if (token) return iniciar();
   if (SEM_LOGIN) { try { await entrarAnonimo(); return iniciar(); } catch (er) { showAuth('login', er.message); return; } }
   showAuth('login');
@@ -355,7 +356,7 @@ renderTop = function(){ if (S.empresas.length) _rt(); };
 renderMain = function(){
   if (!S.empresas.length) return;
   _rm();
-  if (S.empresas.length > 1 && ['inicio', 'empresas', 'integracoes', 'configuracoes'].indexOf(ui.page) < 0) {
+  if (S.empresas.length > 1 && ['empresas', 'integracoes', 'configuracoes'].indexOf(ui.page) < 0) {
     ($('#main').firstElementChild || $('#main')).insertAdjacentHTML('afterbegin', '<div class="mobemp"><label for="empresaM">Empresa</label><select id="empresaM" class="in">' + S.empresas.map(e => '<option value="' + e.id + '"' + (e.id === S.empresaId ? ' selected' : '') + '>' + esc(e.nome) + '</option>').join('') + '</select></div>');
   }
 };
@@ -376,7 +377,7 @@ async function carregarSituacao(id, forcar){
     SIT[id] = s;
   } catch (er) { sitErro = er.message; }
   sitCarregando = null;
-  if (ui.page === 'situacao') renderMain();
+  if (ui.page === 'situacao' || ui.page === 'inicio') renderMain();
 }
 ACT['sit-atualizar'] = rodar(async () => { delete SIT[S.empresaId]; renderMain(); await carregarSituacao(S.empresaId, true); toast(sitErro ? sitErro : 'Situação atualizada nas fontes oficiais.'); });
 ACT['sit-ir-autorizar'] = () => { const el = $('#autorizar'); if (el) el.closest('section').scrollIntoView({behavior:'smooth', block:'start'}); };
@@ -427,7 +428,7 @@ function pgSituacao(){
   const e = empAtual(), s = SIT[e.id];
   if (!s) {
     carregarSituacao(e.id);
-    return head('Situação fiscal', esc(e.nome) + (e.cnpj ? ' · ' + esc(fmtCnpj(e.cnpj)) : '')) +
+    return head('Situação da empresa', esc(e.nome) + (e.cnpj ? ' · ' + esc(fmtCnpj(e.cnpj)) : '')) +
       '<section class="card sitload" aria-busy="true"><p><b>Consultando as fontes oficiais…</b></p><p class="hint">Receita Federal (cadastro) e PGFN (dívida ativa da União e do FGTS).</p></section>';
   }
   const c = s.cadastro, v = s.resumo, nv = NIVEL[v.nivel] || NIVEL.info;
@@ -447,7 +448,7 @@ function pgSituacao(){
     ['voce', 'Informado por você', '']];
   const lista = GRUPOS.map(g => { const bs = s.blocos.filter(b => (b.grupo || 'auto') === g[0]); if (!bs.length) return '';
     return sec('sb-' + g[0], g[1], (g[2] ? '<p class="sub" style="margin:0 0 6px">' + g[2] + '</p>' : '') + '<ul class="sitlist">' + bs.map(linhaB).join('') + '</ul>'); }).join('');
-  if (s.pgfnRodando && ui.page === 'situacao') { clearTimeout(pgSituacao.t); pgSituacao.t = setTimeout(() => { if (ui.page === 'situacao' && S.empresaId === e.id) { delete SIT[e.id]; carregarSituacao(e.id); } }, 30000); }
+  if (s.pgfnRodando && (ui.page === 'situacao' || ui.page === 'inicio')) { clearTimeout(pgSituacao.t); pgSituacao.t = setTimeout(() => { if ((ui.page === 'situacao' || ui.page === 'inicio') && S.empresaId === e.id) { delete SIT[e.id]; carregarSituacao(e.id); } }, 30000); }
 
   let dados = '';
   if (c) {
@@ -497,6 +498,47 @@ function pgSituacao(){
     '<ul class="atalhos">' + L.todos.map(l => '<li><a href="' + l.url + '" target="_blank" rel="noopener"><span><b>' + esc(l.txt) + '</b><small>' + esc(l.desc) + '</small></span>' + ic('right', 16) + '</a></li>').join('') + '</ul>' +
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
-  return head('Situação fiscal', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + meiSec + passos + '</div><div class="stack">' + dados + atalhos + linha + '</div></div>' + limites;
+  return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
+    veredito + numerosInicio() + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + meiSec + passos + '</div><div class="stack">' + dados + atalhos + linha + '</div></div>' + limites;
 }
+
+
+/* ---------- Menu enxuto: 5 telas, sem informação repetida ---------- */
+NAV.splice(0, NAV.length, ['inicio','Início','home'], ['guias','Guias e pagamentos','wallet'], ['documentos','Documentos','folder'], ['empresas','Minhas empresas','building'], ['configuracoes','Configurações','gear']);
+PAGES.splice(0, PAGES.length, ...NAV.map(n => n[0]));
+const ALIAS = {situacao:'inicio', relatorios:'inicio', assistente:'inicio', calendario:'guias'};
+route = function(){
+  let h = (location.hash || '').replace('#', '');
+  if (h === 'calendario') ui.gv = 'cal';
+  h = ALIAS[h] || h;
+  ui.page = PAGES.indexOf(h) > -1 || h === 'integracoes' ? h : 'inicio';
+};
+pgInicio = function(){ return pgSituacao(); };
+/** Três números que resumem as guias cadastradas (o resto da tela vem das fontes oficiais). */
+function numerosInicio(){
+  const st = stats(), mesNome = MESES[today().getMonth()].toLowerCase();
+  const kp = (icone, tom, rot, sub, val, vt) => '<div class="card kpi"><span class="kicon ' + tom + '">' + icone + '</span><div><div class="klabel">' + rot + '</div><div class="ksub">' + sub + '</div><div class="kval' + (vt ? ' ' + vt : '') + '">' + val + '</div></div></div>';
+  return '<div class="kpis kpis3" style="margin-top:20px">' +
+    kp(ic('alert', 24), 'bad', 'Total pendente', 'guias em aberto', brl(st.totalPend), st.totalPend ? 'bad' : '') +
+    kp(ic('calendar', 24), 'brand', 'Vencem em 7 dias', st.prox7.length === 1 ? 'guia' : 'guias', st.prox7.length) +
+    kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, 'pagamentos registrados', brl(st.pagosMes), 'ok') + '</div>';
+}
+/* Guias e calendário na mesma tela, com um seletor. */
+ui.gv = ui.gv || 'lista';
+const _pgGuias = pgGuias;
+pgGuias = function(){ return ui.gv === 'cal' ? pgCal() : _pgGuias(); };
+ACT.gv = el => { ui.gv = el.dataset.v; renderMain(); };
+const _rmEnxuto = renderMain;
+renderMain = function(){
+  _rmEnxuto();
+  if (ui.page === 'guias' && S.empresas.length) {
+    const ph = $('#main .pagehead');
+    if (ph) ph.insertAdjacentHTML('beforeend', '<div class="seg" role="group" aria-label="Ver como"><button data-action="gv" data-v="lista" aria-pressed="' + (ui.gv !== 'cal') + '">Lista</button><button data-action="gv" data-v="cal" aria-pressed="' + (ui.gv === 'cal') + '">Calendário</button></div>');
+  }
+};
+/* Barra do celular: as mesmas 5 telas, sem "Mais". */
+renderTab = function(){
+  if (!S.empresas.length) return;
+  const tabs = [['inicio','Início','home'], ['guias','Guias','wallet'], ['documentos','Documentos','folder'], ['empresas','Empresas','building'], ['configuracoes','Ajustes','gear']];
+  $('#tabbar').innerHTML = tabs.map(n => '<a href="#' + n[0] + '"' + (ui.page === n[0] ? ' aria-current="page"' : '') + '>' + ic(n[2], 22) + n[1] + '</a>').join('');
+};

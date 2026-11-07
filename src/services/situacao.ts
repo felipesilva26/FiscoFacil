@@ -108,7 +108,7 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
   const resumo = alertas.length
     ? { nivel: 'alerta' as Nivel, titulo: alertas.length === 1 ? 'Há 1 ponto de atenção' : `Há ${alertas.length} pontos de atenção`, texto: alertas.map((b) => `${b.titulo}: ${b.texto}`).join(' ') }
     : pendentes.length
-      ? { nivel: 'info' as Nivel, titulo: 'Ainda não dá para dizer que está tudo em dia', texto: `Ainda falta conferir: ${pendentes.map((b) => b.titulo).join('; ')}.` }
+      ? { nivel: 'info' as Nivel, titulo: 'Ainda não dá para dizer que está tudo em dia', texto: `${pendentes.length} ${pendentes.length === 1 ? 'item ainda não pôde ser conferido' : 'itens ainda não puderam ser conferidos'}. Veja abaixo o que já foi conferido e o que falta.` }
       : { nivel: 'ok' as Nivel, titulo: 'Tudo em dia', texto: 'Nenhuma pendência nas fontes conferidas.' };
 
   return {

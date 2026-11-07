@@ -39,6 +39,10 @@ sub('<meta name="claude:viewport-fit-sides" content="cover">', '<!doctype html>\
 sub("""'<button class="ib" id="phoneBtn" data-action="phone" aria-pressed="' + ui.phone + '" aria-label="Ver como celular">' + ic('phone') + '</button>' +""", "")
 sub("NAV.map(n => '<a href=\"#' + n[0] + '\"' + (ui.page === n[0]", "NAV.map(n => '<a href=\"#' + n[0] + '\" title=\"' + n[1] + '\"' + (ui.page === n[0]")
 sub("if (t.id === 'empresa') {", "if (t.id === 'empresa' || t.id === 'empresaM') {")
+# ---- menu enxuto: sem telas repetidas ----
+sub("'<div class=\"tools\">' + (ui.page === 'inicio' ? '' : '<label", "'<div class=\"tools\">' + (false ? '' : '<label")
+sub("return head('Configurações', 'Ajuste o perfil, a empresa, os lembretes e as integrações.') + '<div class=\"cfggrid\">' + perfil + emp + lem + rec + dados + '</div>';",
+    "return head('Configurações', 'Dados da empresa, lembretes e conta.') + '<div class=\"cfggrid\">' + (SEM_LOGIN ? '' : perfil) + emp + lem + dados + '</div>';")
 # ---- refinamento visual (Impeccable) ----
 n = s.count('</td><td class="num">\' + brl(o.valor)')
 assert n == 2, n
