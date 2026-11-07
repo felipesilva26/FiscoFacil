@@ -228,6 +228,7 @@ export async function importarPgfn(ctx: Ctx, opts: { forcar?: boolean } = {}): P
   if (!pub) return { trimestre: null, origens: [], novas: 0, motivo: 'Não encontrei arquivos publicados pela PGFN.' };
 
   const res: ResultadoImportacao = { trimestre: pub.trimestre, origens: [], novas: 0 };
+  console.log(`PGFN: publicação ${pub.trimestre}: ${pub.urls.map((u) => u.origem).join(', ')}`);
   for (const { origem, url } of pub.urls) {
     const { rows } = await ctx.db.query('select cnpj from pgfn_verificados where trimestre = $1 and origem = $2', [pub.trimestre, origem]);
     const feitos = new Set(rows.map((r) => r.cnpj as string));

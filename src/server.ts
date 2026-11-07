@@ -37,6 +37,9 @@ process.on('SIGTERM', parar);
 await app.listen({ port: cfg.port, host: '0.0.0.0' });
 // Confere na PGFN os CNPJs que ainda não foram conferidos (não baixa nada se já estiver tudo em dia).
 agendarPgfn(ctx, 20_000);
+db.query('select trimestre, origem, linhas, encontrados, cnpjs_verificados, concluido_em from pgfn_importacoes order by concluido_em')
+  .then((r) => app.log.info({ pgfnImportacoes: r.rows }, 'PGFN: importações já feitas'))
+  .catch(() => undefined);
 
 // Diagnóstico ao iniciar: confere se cada fonte da consulta cadastral responde daqui do servidor.
 for (const modelo of cfg.cnpjLookupUrl.split(',').map((m) => m.trim()).filter(Boolean)) {
