@@ -107,11 +107,15 @@ describe('situação fiscal ponta a ponta', () => {
 
   test('antes da importação: cadastro ok, dívida pendente; depois: alerta com aviso por e-mail', async () => {
     const { h } = await cadastrar(t.app);
-    const e = (await t.app.inject({ method: 'POST', url: '/api/empresas', headers: h, payload: { nome: 'Teste', cnpj: CNPJ_TESTE } })).json();
+    const e = (await t.app.inject({ method: 'POST', url: '/api/empresas', headers: h, payload: { nome: 'Teste', cnpj: CNPJ_TESTE, regime: 'Lucro Real' } })).json();
     const s1 = (await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/situacao/atualizar`, headers: h })).json();
     assert.equal(s1.blocos.find((b: { id: string }) => b.id === 'cadastro').nivel, 'ok');
     assert.equal(s1.blocos.find((b: { id: string }) => b.id === 'divida').nivel, 'pendente');
     assert.equal(s1.cadastro.razaoSocial, 'EMPRESA DE TESTE LTDA');
+    const reg = (await t.app.inject({ method: 'GET', url: `/api/empresas/${e.id}`, headers: h })).json();
+    assert.equal(reg.regime, 'Simples Nacional', 'regime vem da Receita');
+    const cn = (await t.app.inject({ method: 'GET', url: `/api/cnpj/${CNPJ_TESTE.replace(/\D/g, '')}`, headers: h })).json();
+    assert.equal(cn.regime.regime, 'Simples Nacional'); assert.equal(cn.nome, 'EMPRESA DE TESTE LTDA');
 
     const r = await importarPgfn(t.ctx);
     assert.equal(r.trimestre, '2026_trimestre_03'); assert.equal(r.novas, 1);
@@ -146,5 +150,22 @@ describe('situação fiscal ponta a ponta', () => {
     assert.equal(s.blocos[0].nivel, 'alerta');
     const al = (await t.app.inject({ method: 'GET', url: '/api/alertas', headers: h })).json();
     assert.ok(al.some((x: { texto: string }) => /ATIVA para INAPTA/.test(x.texto)));
+  });
+});
+
+describe('regime tributário pelo cadastro', () => {
+  test('MEI, Simples e fora do Simples', async () => {
+    const { regimePelaReceita, nomeSugerido } = await import('../src/cnpj.js');
+    const base = { atividadesSecundarias: 0, socios: 0, linhaDoTempo: [], fonte: 'x', consultadoEm: '' };
+    const mei = regimePelaReceita({ ...base, mei: true, meiDesde: '2026-04-21', simples: true, natureza: 'Empresário (Individual)' })!;
+    assert.equal(mei.regime, 'MEI'); assert.equal(mei.texto, 'MEI desde 21/04/2026'); assert.deepEqual(mei.opcoes, []);
+    const sn = regimePelaReceita({ ...base, mei: false, meiExclusao: '2025-12-31', simples: true, simplesDesde: '2019-03-10' })!;
+    assert.equal(sn.regime, 'Simples Nacional'); assert.match(sn.historico[0], /Deixou de ser MEI em 31\/12\/2025/);
+    const lucro = regimePelaReceita({ ...base, mei: false, simples: false })!;
+    assert.equal(lucro.regime, null); assert.deepEqual(lucro.opcoes, ['Lucro Presumido', 'Lucro Real']);
+    assert.equal(regimePelaReceita(null), null);
+    assert.equal(regimePelaReceita({ ...base, mei: null, simples: null }), null);
+    assert.equal(nomeSugerido({ ...base, mei: true, simples: true, razaoSocial: '66.369.868 RICHARDS FELIPE DO CARMO' }), 'RICHARDS FELIPE DO CARMO');
+    assert.equal(nomeSugerido({ ...base, mei: true, simples: true, razaoSocial: '66369868 FULANO' }), 'FULANO');
   });
 });

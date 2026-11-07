@@ -200,3 +200,37 @@ export function avaliarCadastro(c: Cadastral | null): { nivel: 'ok' | 'alerta' |
   };
   return { nivel: 'alerta', texto: m[c.situacao.toUpperCase()] ?? `Situação cadastral: ${c.situacao}.` };
 }
+
+export interface RegimeIdentificado {
+  /** Regime que dá para afirmar pelo cadastro público; null quando a Receita não divulga. */
+  regime: 'MEI' | 'Simples Nacional' | null;
+  /** Quando não é MEI nem Simples, sobram só estas opções. */
+  opcoes: ('Lucro Presumido' | 'Lucro Real')[];
+  desde?: string;
+  texto: string;
+  historico: string[];
+  tipo?: string;
+}
+
+/**
+ * Regime tributário a partir do cadastro público (opção pelo Simples e pelo MEI, com datas).
+ * O cadastro diz com certeza se é MEI ou Simples. Fora deles, NÃO diz se é Lucro Presumido ou Real:
+ * essa escolha é feita na declaração anual e não é pública.
+ */
+export function regimePelaReceita(c: Cadastral | null): RegimeIdentificado | null {
+  if (!c || (c.mei === null && c.simples === null)) return null;
+  const br = (d?: string) => (d ? d.split('-').reverse().join('/') : '');
+  const historico: string[] = [];
+  if (c.meiExclusao) historico.push(`Deixou de ser MEI em ${br(c.meiExclusao)}`);
+  if (c.simplesExclusao) historico.push(`Saiu do Simples Nacional em ${br(c.simplesExclusao)}`);
+  const tipo = c.natureza;
+  if (c.mei) return { regime: 'MEI', opcoes: [], desde: c.meiDesde, texto: `MEI${c.meiDesde ? ` desde ${br(c.meiDesde)}` : ''}`, historico, tipo };
+  if (c.simples) return { regime: 'Simples Nacional', opcoes: [], desde: c.simplesDesde, texto: `Simples Nacional${c.simplesDesde ? ` desde ${br(c.simplesDesde)}` : ''}`, historico, tipo };
+  return { regime: null, opcoes: ['Lucro Presumido', 'Lucro Real'], texto: 'Fora do Simples: Lucro Presumido ou Lucro Real (a Receita não divulga qual)', historico, tipo };
+}
+
+/** Nome para mostrar: tira o número do CNPJ que vem na frente da razão social do MEI. */
+export function nomeSugerido(c: Cadastral | null): string {
+  const n = (c?.nomeFantasia || c?.razaoSocial || '').trim();
+  return n.replace(/^\d{2}\.?\d{3}\.?\d{3}\s+/, '').trim() || n;
+}

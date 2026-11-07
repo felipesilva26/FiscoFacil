@@ -215,3 +215,15 @@ h1{letter-spacing:-.018em}
 .atalhos small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 .atalhos .ic{color:var(--muted);flex:none}
 @container app (max-width:700px){.sitrow{grid-template-columns:minmax(0,1fr)}}
+/* Regime identificado no cadastro */
+.lbl{display:block;font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ink)}
+.regbox{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid #C9EBD5;border-radius:12px;background:var(--ok-bg)}
+.regbox>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.regbox b{font-size:15px}
+.regbox small{color:var(--ink-2);font-size:12.5px}
+.regbox .linkbtn{align-self:flex-start;font-size:13px;color:var(--brand-text);padding:0;min-height:32px}
+.regopts{border:0;padding:0;margin:0}
+.regopt{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer;background:var(--card)}
+.regopt:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.regopt input{margin-top:3px;width:18px;height:18px;accent-color:var(--brand)}
+.regopt small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}

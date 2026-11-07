@@ -1,4 +1,4 @@
-import { avaliarCadastro, lookupCnpj, type Cadastral } from '../cnpj.js';
+import { avaliarCadastro, lookupCnpj, regimePelaReceita, type Cadastral } from '../cnpj.js';
 import type { Ctx } from '../ctx.js';
 import type { Row } from '../db.js';
 import { dividaDoCnpj } from '../pgfn/importador.js';
@@ -13,6 +13,13 @@ export async function atualizarCadastro(ctx: Ctx, e: Row): Promise<Cadastral> {
   const novo = await lookupCnpj(e.cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) });
   const antigo = (e.cadastral ?? null) as Cadastral | null;
   await ctx.db.query('update empresas set cadastral = $1 where id = $2', [JSON.stringify(novo), e.id]);
+  // Regime: MEI e Simples a Receita informa com certeza; fora deles, mantém o que o dono escolheu entre Presumido e Real.
+  const reg = regimePelaReceita(novo);
+  if (reg?.regime && reg.regime !== e.regime) {
+    await ctx.db.query('update empresas set regime = $1 where id = $2', [reg.regime, e.id]);
+  } else if (reg && !reg.regime && (e.regime === 'MEI' || e.regime === 'Simples Nacional')) {
+    await ctx.db.query("update empresas set regime = 'Lucro Presumido' where id = $1", [e.id]);
+  }
   if (antigo && antigo.situacao) {
     const mudou: string[] = [];
     if (antigo.situacao !== novo.situacao) mudou.push(`a situação cadastral mudou de ${antigo.situacao} para ${novo.situacao ?? 'desconhecida'}`);

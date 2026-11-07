@@ -548,6 +548,18 @@ h1{letter-spacing:-.018em}
 .atalhos small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 .atalhos .ic{color:var(--muted);flex:none}
 @container app (max-width:700px){.sitrow{grid-template-columns:minmax(0,1fr)}}
+/* Regime identificado no cadastro */
+.lbl{display:block;font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ink)}
+.regbox{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid #C9EBD5;border-radius:12px;background:var(--ok-bg)}
+.regbox>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.regbox b{font-size:15px}
+.regbox small{color:var(--ink-2);font-size:12.5px}
+.regbox .linkbtn{align-self:flex-start;font-size:13px;color:var(--brand-text);padding:0;min-height:32px}
+.regopts{border:0;padding:0;margin:0}
+.regopt{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer;background:var(--card)}
+.regopt:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.regopt input{margin-top:3px;width:18px;height:18px;accent-color:var(--brand)}
+.regopt small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 
 </style>
 
@@ -1248,7 +1260,7 @@ const rodar = fn => async function(el){ try { await fn(el); } catch (er) { falho
 
 /* ---------- cadastro da empresa: só o CNPJ ---------- */
 let onb;
-function onbReset(ctx){ onb = {etapa:'cnpj', cnpj:'', cad:null, aviso:'', ctx:ctx || 'primeira'}; }
+function onbReset(ctx){ onb = {etapa:'cnpj', cnpj:'', cad:null, reg:null, nome:'', trocarRegime:false, aviso:'', ctx:ctx || 'primeira'}; }
 onbReset();
 const regimeDe = c => !c ? 'Simples Nacional' : c.mei ? 'MEI' : c.simples ? 'Simples Nacional' : c.simples === false ? 'Lucro Presumido' : 'Simples Nacional';
 function onbHTML(){
@@ -1261,12 +1273,36 @@ function onbHTML(){
   const linhaC = (rot, val) => val ? '<div class="onbrow"><dt>' + rot + '</dt><dd>' + esc(val) + '</dd></div>' : '';
   const regTxt = c ? (c.mei ? 'MEI' + (c.meiDesde ? ' desde ' + fmtDate(c.meiDesde) : '') : c.simples ? 'Simples Nacional' + (c.simplesDesde ? ' desde ' + fmtDate(c.simplesDesde) : '') : c.simples === false ? 'Fora do Simples' : '') : '';
   const resumo = c ? '<div class="onbcard"><b>' + esc(c.razaoSocial || 'Empresa') + '</b><span class="num">' + esc(onb.cnpj) + '</span><span class="onbmeta">' + sit + esc([c.municipio, c.uf].filter(Boolean).join('/')) + '</span>' +
-      '<dl class="onbdl">' + linhaC('O que faz', c.atividade) + linhaC('Regime', regTxt) + linhaC('Porte', c.porte) + linhaC('Aberta em', c.abertura ? fmtDate(c.abertura) : '') + '</dl></div>'
+      '<dl class="onbdl">' + linhaC('O que faz', c.atividade) + linhaC('Tipo', c.natureza) + linhaC('Porte', c.porte) + linhaC('Aberta em', c.abertura ? fmtDate(c.abertura) : '') + '</dl></div>'
     : '<p class="note">' + esc(onb.aviso || 'Preencha o nome da empresa para continuar.') + '</p>';
   return '<form id="formOnbConfirmar" class="form">' + resumo +
-    field('onome', 'Nome para mostrar no sistema', '<input id="onome" class="in" autocomplete="organization" value="' + esc(c ? (c.nomeFantasia || c.razaoSocial || '') : '') + '">') +
-    field('oreg', 'Regime tributário (confira)', '<select id="oreg" class="in">' + REGIMES.map(x => '<option' + (regimeDe(c) === x ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>', c ? 'Preenchido pelo cadastro da Receita. Ajuste se estiver diferente.' : '') +
+    field('onome', 'Nome para mostrar no sistema', '<input id="onome" class="in" autocomplete="organization" value="' + esc(c ? (onb.nome || c.nomeFantasia || c.razaoSocial || '') : '') + '">') +
+    regimeHTML() +
     '<p class="err" id="ferr" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-action="onb-voltar">Trocar CNPJ</button><button class="btn primary" type="submit">Confirmar e ver a situação fiscal</button></div></form>';
+}
+function regimeHTML(){
+  const r = onb.reg;
+  const lista = sel => '<select id="oreg" class="in">' + REGIMES.map(x => '<option' + (sel === x ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>';
+  if (r && r.regime && !onb.trocarRegime) {
+    return '<div class="field"><span class="lbl">Regime tributário</span><div class="regbox"><input type="hidden" id="oreg" value="' + esc(r.regime) + '">' +
+      '<div><b>' + esc(r.texto) + '</b><span class="chip pago"><i></i>Identificado na Receita</span></div>' +
+      r.historico.map(h => '<small>' + esc(h) + '</small>').join('') +
+      '<button type="button" class="linkbtn" data-action="onb-trocar-regime">Não está certo? Alterar</button></div></div>';
+  }
+  if (r && !r.regime && r.opcoes.length && !onb.trocarRegime) {
+    return '<fieldset class="field regopts"><legend class="lbl">Regime tributário</legend>' +
+      '<p class="hint" style="margin:0 0 8px">A Receita informa que a empresa <b>não é MEI nem Simples</b>. Se é Lucro Presumido ou Lucro Real não é público: escolha abaixo (o contador sabe).</p>' +
+      r.opcoes.map(o => '<label class="regopt"><input type="radio" name="oregr" value="' + o + '"><span><b>' + o + '</b><small>' + (o === 'Lucro Presumido' ? 'O mais comum para empresas pequenas e médias fora do Simples' : 'Obrigatório para faturamento acima de R$ 78 milhões e alguns setores') + '</small></span></label>').join('') +
+      r.historico.map(h => '<small class="hint">' + esc(h) + '</small>').join('') + '</fieldset>';
+  }
+  return field('oreg', 'Regime tributário', lista(regimeDe(onb.cad)), onb.cad ? 'Confira e ajuste se precisar.' : 'Não consegui confirmar na Receita: escolha o regime.');
+}
+document.addEventListener('change', e => { if (e.target.name === 'oregr') { const f = $('#ferr'); if (f) f.textContent = ''; } });
+ACT['onb-trocar-regime'] = () => { onb.trocarRegime = true; onbRedesenhar(); const f = $('#oreg'); if (f) f.focus(); };
+function regimeEscolhido(){
+  const radio = document.querySelector('input[name="oregr"]:checked');
+  if (document.querySelector('input[name="oregr"]') && !radio) throw new Error('Escolha se a empresa é Lucro Presumido ou Lucro Real.');
+  return radio ? radio.value : $('#oreg').value;
 }
 function onbRedesenhar(){
   if (onb.ctx === 'primeira') { showAuth('primeira'); return; }
@@ -1331,14 +1367,14 @@ const SUB = {
     const v = $('#ocnpj').value;
     if (!validCnpj(v)) throw new Error('CNPJ inválido. Confira os 14 números.');
     onb.cnpj = fmtCnpj(v); onb.erro = '';
-    try { onb.cad = (await api('GET', '/api/cnpj/' + onlyD(v))).cadastral; }
-    catch (er) { if (er.status === 400) throw er; onb.cad = null; onb.aviso = er.status === 404 ? 'Não encontrei este CNPJ na base pública da Receita. Se a empresa é nova, preencha os dados abaixo.' : 'Não consegui buscar os dados agora. Preencha o nome da empresa para continuar.'; }
+    try { const r = await api('GET', '/api/cnpj/' + onlyD(v)); onb.cad = r.cadastral; onb.reg = r.regime || null; onb.nome = r.nome || ''; }
+    catch (er) { if (er.status === 400) throw er; onb.cad = null; onb.reg = null; onb.aviso = er.status === 404 ? 'Não encontrei este CNPJ na base pública da Receita. Se a empresa é nova, preencha os dados abaixo.' : 'Não consegui buscar os dados agora. Preencha o nome da empresa para continuar.'; }
     onb.etapa = 'confirmar'; onbRedesenhar();
   },
   async formOnbConfirmar(){
     const nome = $('#onome').value.trim();
     if (nome.length < 2) throw new Error('Informe o nome da empresa.');
-    const e = await api('POST', '/api/empresas', {nome:nome, cnpj:onb.cnpj, regime:$('#oreg').value});
+    const e = await api('POST', '/api/empresas', {nome:nome, cnpj:onb.cnpj, regime:regimeEscolhido()});
     const primeira = onb.ctx === 'primeira';
     onbReset();
     S.empresaId = e.id;

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CnpjError, formatCnpj, lookupCnpj, onlyDigits, validCnpj } from '../cnpj.js';
+import { CnpjError, formatCnpj, lookupCnpj, onlyDigits, validCnpj, nomeSugerido, regimePelaReceita } from '../cnpj.js';
 import type { Ctx } from '../ctx.js';
 import { ReceitaNaoConfigurada } from '../receita/provider.js';
 import { sincronizarReceita } from '../receita/sync.js';
@@ -120,7 +120,8 @@ export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {
   app.get('/api/cnpj/:cnpj', { preHandler: guard, ...limite }, async (req, reply) => {
     const cnpj = (req.params as { cnpj: string }).cnpj;
     try {
-      return { cnpj: formatCnpj(cnpj), valido: true, cadastral: await lookupCnpj(cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) }) };
+      const cadastral = await lookupCnpj(cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) });
+      return { cnpj: formatCnpj(cnpj), valido: true, cadastral, regime: regimePelaReceita(cadastral), nome: nomeSugerido(cadastral) };
     } catch (e) {
       if (e instanceof CnpjError) {
         if (e.status === 400) return reply.code(400).send({ cnpj: formatCnpj(cnpj), valido: false, erro: e.message });
