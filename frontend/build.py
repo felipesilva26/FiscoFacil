@@ -42,7 +42,7 @@ sub("if (t.id === 'empresa') {", "if (t.id === 'empresa' || t.id === 'empresaM')
 # ---- menu enxuto: sem telas repetidas ----
 sub("'<div class=\"tools\">' + (ui.page === 'inicio' ? '' : '<label", "'<div class=\"tools\">' + (false ? '' : '<label")
 sub("return head('Configurações', 'Ajuste o perfil, a empresa, os lembretes e as integrações.') + '<div class=\"cfggrid\">' + perfil + emp + lem + rec + dados + '</div>';",
-    "return head('Configurações', 'Dados da empresa, lembretes e conta.') + '<div class=\"cfggrid\">' + (SEM_LOGIN ? '' : perfil) + emp + lem + dados + '</div>';")
+    "return head('Configurações', 'Dados da empresa, lembretes e conta.') + '<div class=\"cfggrid\">' + (S.user.anonimo ? '' : perfil) + emp + lem + dados + '</div>';")
 # ---- refinamento visual (Impeccable) ----
 n = s.count('</td><td class="num">\' + brl(o.valor)')
 assert n == 2, n
@@ -51,12 +51,19 @@ assert s.count('<th>Valor</th>') == 2
 s = s.replace('<th>Valor</th>', '<th class="money">Valor</th>')
 sub("const L = guiasFiltered();", "const L = guiasFiltered().slice().sort((a, b) => (!!a.pagoEm - !!b.pagoEm) || (a.pagoEm ? (a.venc < b.venc ? 1 : -1) : (a.venc < b.venc ? -1 : 1)));")
 sub('<span class="pill" aria-hidden="true">★ Novidade!</span><h2 id="pr" class="sr">Novidade: assistente fiscal</h2>', '<h2 id="pr">Tire dúvidas com o assistente</h2>')
-css = (root / 'polish.css').read_text()
+# Fontes servidas pelo próprio site (sem enviar o IP de quem acessa ao Google).
+import re, shutil
+s = re.sub(r'<link href="https://fonts\.googleapis\.com[^>]*>\n?', '', s)
+(root.parent / 'public' / 'fonts').mkdir(parents=True, exist_ok=True)
+for f in (root / 'fonts').glob('*.woff2'): shutil.copy(f, root.parent / 'public' / 'fonts' / f.name)
+FONTES = ''.join("@font-face{font-family:'%s';font-style:normal;font-weight:%s;font-display:swap;src:url(/fonts/%s) format('woff2')}\n" % (fam, w, arq)
+  for fam, w, arq in [('Plus Jakarta Sans', w, 'plus-jakarta-sans-latin-%s-normal.woff2' % w) for w in (400, 500, 600, 700)] + [('Sora', w, 'sora-latin-%s-normal.woff2' % w) for w in (600, 700)])
+css = FONTES + (root / 'polish.css').read_text()
 sub("</style>", css + "\n</style>")
 # bloco "Dados do MVP" vira "Conta"
 a = s.index("const dados = sec('cd', 'Dados do MVP'")
 b = s.index("return head('Configurações'")
-s = s[:a] + "const dados = sec('cd', 'Conta', '<p class=\"sub\" style=\"margin:0 0 12px\">' + (SEM_LOGIN ? 'Versão de teste, sem login: os dados ficam ligados a este navegador.' : 'Conectado como <b>' + esc(S.user.email || '') + '</b>. Os dados ficam guardados no servidor.') + '</p><button class=\"btn ghost\" data-action=\"sair\">' + (SEM_LOGIN ? 'Apagar e começar do zero' : 'Sair') + '</button>');\n  " + s[b:]
+s = s[:a] + "const dados = contaSec();\n  " + s[b:]
 # INTEG estática some: a página usa os dados do servidor
 a = s.index("const INTEG = [")
 b = s.index("function pgInteg(){")
@@ -64,6 +71,5 @@ c = s.index("function pgCfg(){")
 s = s[:a] + "function pgInteg(){ return ''; }\n" + s[c:]
 # início: não carregar dados de exemplo, entrar pela tela de login
 sub("route();\nrenderAll();\n})();", layer + "\nroute();\nboot();\n})();")
-(root.parent / 'public').mkdir(exist_ok=True)
 (root.parent / 'public' / 'index.html').write_text(s)
 print('ok', len(s))

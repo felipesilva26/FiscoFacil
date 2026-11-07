@@ -21,7 +21,7 @@ export async function verifyPassword(pw: string, stored: string): Promise<boolea
 
 const key = (secret: string) => new TextEncoder().encode(secret);
 
-export function signToken(secret: string, userId: string, ttl = '12h'): Promise<string> {
+export function signToken(secret: string, userId: string, ttl = '30d'): Promise<string> {
   return new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId)

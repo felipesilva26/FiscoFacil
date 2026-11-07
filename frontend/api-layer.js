@@ -18,25 +18,30 @@ async function api(method, url, body, isForm){
 let SEM_LOGIN = false;
 function logout(){
   token = ''; try { localStorage.removeItem(TK); } catch (e) {}
-  if (SEM_LOGIN) { S.empresas = []; entrarAnonimo().then(iniciar).catch(er => showAuth('login', er.message)); return; }
-  showAuth('login');
+  // Limpa o que estava na memória da tela: outra pessoa pode entrar neste navegador.
+  S = {v:1, user:{nome:''}, empresas:[], empresaId:null, obrigacoes:[], docs:[], alertas:[], lembretes:S.lembretes};
+  [SIT, NOTAS, FIN].forEach(o => Object.keys(o).forEach(k => delete o[k]));
+  showAuth(SEM_LOGIN ? 'inicio' : 'login');
 }
 /** Versão de teste sem login: cria uma conta anônima ligada a este navegador. */
 async function entrarAnonimo(){
-  const id = (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^a-z0-9]/gi, '').slice(0, 20);
-  const r = await api('POST', '/api/auth/register', {nome:'Visitante', email:'visitante-' + id + '@fiscofacil.app', senha:id + '-' + Math.random().toString(36).slice(2)});
+  const r = await api('POST', '/api/auth/anonimo', {aceite:true});
   token = r.token; try { localStorage.setItem(TK, token); } catch (e) {}
 }
 async function boot(){
   try { SEM_LOGIN = !!(await api('GET', '/api/health')).semLogin; } catch (e) {}
   document.body.classList.toggle('semlogin', SEM_LOGIN);
-  if (token) return iniciar();
-  if (SEM_LOGIN) { try { await entrarAnonimo(); return iniciar(); } catch (er) { showAuth('login', er.message); return; } }
-  showAuth('login');
+  if (token) {
+    // Sessão deslizante: renova o acesso a cada visita (o token dura 30 dias).
+    try { const r = await api('POST', '/api/auth/renovar'); token = r.token; try { localStorage.setItem(TK, token); } catch (e) {} } catch (e) {}
+    if (token) return iniciar();
+  }
+  showAuth(SEM_LOGIN ? 'inicio' : 'login');
 }
 
 async function loadAll(){
   const me = await api('GET', '/api/auth/me');
+  FIN_ANO = FIN_ANO || today().getFullYear();
   const emps = await api('GET', '/api/empresas');
   const cfgL = await api('GET', '/api/lembretes/config');
   try { INTEG_SRV = await api('GET', '/api/integracoes'); } catch (e) { INTEG_SRV = null; }
@@ -44,12 +49,13 @@ async function loadAll(){
   const obrigacoes = [], docs = [];
   for (const e of emps) {
     try { NOTAS[e.id] = await api('GET', '/api/empresas/' + e.id + '/notas'); } catch (er) { NOTAS[e.id] = null; }
+    try { FIN[e.id] = await api('GET', '/api/empresas/' + e.id + '/financeiro?ano=' + FIN_ANO); } catch (er) { FIN[e.id] = null; }
     const r = await Promise.all([api('GET', '/api/empresas/' + e.id + '/obrigacoes'), api('GET', '/api/empresas/' + e.id + '/obrigacoes?arquivadas=true'), api('GET', '/api/empresas/' + e.id + '/documentos')]);
     r[0].concat(r[1]).forEach(o => obrigacoes.push(o));
     r[2].forEach(x => docs.push({id:x.id, empresaId:x.empresaId, nome:x.nome, tipo:x.tipo, tam:x.tamanho, data:x.data, validade:x.validade}));
   }
   const keep = S.empresaId && emps.some(e => e.id === S.empresaId) ? S.empresaId : (emps[0] ? emps[0].id : null);
-  S = {v:1, user:{nome:me.nome, email:me.email}, empresas:emps.map(e => Object.assign({}, e, {cnpj:e.cnpj || ''})), empresaId:keep, obrigacoes:obrigacoes, docs:docs,
+  S = {v:1, user:{nome:me.nome, email:me.email, anonimo:!!me.anonimo}, empresas:emps.map(e => Object.assign({}, e, {cnpj:e.cnpj || ''})), empresaId:keep, obrigacoes:obrigacoes, docs:docs,
     alertas:alertas, lembretes:{email:cfgL.email, whatsapp:cfgL.whatsapp, push:cfgL.push, antecedencia:String(cfgL.antecedencia)}};
 }
 async function refresh(msg){ if (S.empresaId) delete SIT[S.empresaId]; await loadAll(); closeModal(); renderAll(); if (msg) toast(msg); }
@@ -119,14 +125,21 @@ function showAuth(modo, msg){
   const cad = modo === 'cadastro', prim = modo === 'primeira';
   const campo = (id, lbl, tipo, extra) => '<div class="field"><label for="' + id + '">' + lbl + '</label><input id="' + id + '" class="in" type="' + (tipo || 'text') + '" ' + (extra || '') + '></div>';
   let corpo;
-  if (prim) corpo = '<h1>Cadastre sua empresa</h1><p class="sub">Informe o CNPJ. O FiscoFácil busca os dados nas fontes oficiais.</p>' + onbHTML();
+  const politica = '<a href="/privacidade.html" target="_blank" rel="noopener">política de privacidade</a>';
+  const aceite = '<label class="check aceite"><input type="checkbox" id="aaceite" required> Li e aceito a ' + politica + '. Meus dados são usados só para mostrar a situação fiscal das minhas empresas.</label>';
+  if (modo === 'inicio') corpo = '<h1>Comece agora</h1><p class="sub">Use sem cadastro para testar, ou crie uma conta para acessar de qualquer aparelho.</p><form id="formAnonimo" class="form">' + aceite +
+    '<p class="err" id="aerr" role="alert">' + esc(msg || '') + '</p><div class="actions"><button class="btn primary" type="submit">Usar sem cadastro</button></div></form>' +
+    '<p class="hint" style="margin-top:6px">Sem cadastro, os dados ficam ligados a este navegador. Contas sem uso por 90 dias são apagadas.</p>' +
+    '<p class="hint" style="margin-top:14px"><a href="#" data-action="auth-troca" data-modo="cadastro">Criar conta com e-mail</a> · <a href="#" data-action="auth-troca" data-modo="login">Já tenho conta</a></p>';
+  else if (prim) corpo = '<h1>Cadastre sua empresa</h1><p class="sub">Informe o CNPJ. O FiscoFácil busca os dados nas fontes oficiais.</p>' + onbHTML();
+  else if (modo === 'erro') corpo = '<h1>Não consegui carregar</h1><p class="sub">' + esc(msg || 'O servidor não respondeu.') + ' Seus dados continuam guardados.</p><div class="actions"><button class="btn primary" data-action="tentar-de-novo">Tentar de novo</button></div>';
   else corpo = '<h1>' + (cad ? 'Criar conta' : 'Entrar') + '</h1><p class="sub">' + (cad ? 'Crie sua conta para acompanhar impostos e vencimentos.' : 'Acesse o FiscoFácil.') + '</p><form id="' + (cad ? 'formCadastro' : 'formLogin') + '" class="form">' +
     (cad ? campo('anome', 'Seu nome', 'text', 'autocomplete="name" required') : '') + campo('aemail', 'E-mail', 'email', 'autocomplete="email" required') +
     campo('asenha', 'Senha' + (cad ? ' (mínimo 8 caracteres)' : ''), 'password', 'autocomplete="' + (cad ? 'new-password' : 'current-password') + '" required') +
-    '<p class="err" id="aerr" role="alert">' + esc(msg || '') + '</p><div class="actions"><button class="btn primary" type="submit">' + (cad ? 'Criar conta' : 'Entrar') + '</button></div></form>' +
-    '<p class="hint" style="margin-top:14px"><a href="#" data-action="auth-troca" data-modo="' + (cad ? 'login' : 'cadastro') + '">' + (cad ? 'Já tenho conta' : 'Criar uma conta') + '</a></p>';
+    (cad ? aceite : '') + '<p class="err" id="aerr" role="alert">' + esc(msg || '') + '</p><div class="actions"><button class="btn primary" type="submit">' + (cad ? 'Criar conta' : 'Entrar') + '</button></div></form>' +
+    '<p class="hint" style="margin-top:14px"><a href="#" data-action="auth-troca" data-modo="' + (cad ? 'login' : 'cadastro') + '">' + (cad ? 'Já tenho conta' : 'Criar uma conta') + '</a>' + (SEM_LOGIN ? ' · <a href="#" data-action="auth-troca" data-modo="inicio">Usar sem cadastro</a>' : '') + '</p>';
   const logo = '<div class="brand">' + LOGO + 'FiscoFácil</div>';
-  box.innerHTML = '<div class="authwrap"><aside class="authbrand">' + logo + '<div><h2>Impostos em dia, sem complicação.</h2><p>Vencimentos, guias e documentos de todas as suas empresas em um só lugar.</p></div><ul><li>Alertas antes de cada vencimento</li><li>Leitura automática de guias e certidões</li><li>Todos os seus CNPJs numa única tela</li></ul></aside><div class="authside"><div class="authcard card">' + corpo + '</div></div></div>';
+  box.innerHTML = '<div class="authwrap"><aside class="authbrand">' + logo + '<div><h2>Impostos em dia, sem complicação.</h2><p>Vencimentos, guias e documentos de todas as suas empresas em um só lugar.</p></div><ul><li>Alertas antes de cada vencimento</li><li>Leitura automática de guias e certidões</li><li>Todos os seus CNPJs numa única tela</li></ul><p class="authpriv"><a href="/privacidade.html" target="_blank" rel="noopener">Privacidade e LGPD</a></p></aside><div class="authside"><div class="authcard card">' + corpo + '</div></div></div>';
   box.hidden = false;
   const f = box.querySelector('input'); if (f) f.focus();
 }
@@ -142,8 +155,9 @@ async function iniciar(){
     if (!S.empresas.length) { showAuth('primeira'); return; }
     hideAuth(); route(); renderAll();
   } catch (er) {
-    if (SEM_LOGIN && !iniciar.tentou) { iniciar.tentou = true; token = ''; try { await entrarAnonimo(); return iniciar(); } catch (e2) { er = e2; } }
-    showAuth('login', er.message);
+    // Erro de rede ou do servidor não pode criar outra conta: os dados continuariam na conta antiga.
+    if (token && er.status !== 401) { showAuth('erro', er.message); return; }
+    showAuth(SEM_LOGIN ? 'inicio' : 'login', er.message);
   }
 }
 ACT['auth-troca'] = (el, e) => { if (e) e.preventDefault(); showAuth(el.dataset.modo); };
@@ -154,7 +168,17 @@ const _bell = ACT.bell; ACT.bell = function(el){ _bell(el); if (ui.alerts && (S.
 
 const SUB = {
   async formLogin(){ await entrar('/api/auth/login', {email:$('#aemail').value, senha:$('#asenha').value}); },
-  async formCadastro(){ await entrar('/api/auth/register', {nome:$('#anome').value, email:$('#aemail').value, senha:$('#asenha').value}); },
+  async formCadastro(){ if (!$('#aaceite').checked) throw new Error('Para continuar, aceite a política de privacidade.'); await entrar('/api/auth/register', {nome:$('#anome').value, email:$('#aemail').value, senha:$('#asenha').value, aceite:true}); },
+  async formAnonimo(){ if (!$('#aaceite').checked) throw new Error('Para continuar, aceite a política de privacidade.'); await entrarAnonimo(); await iniciar(); },
+  async formProteger(){
+    const r = await api('POST', '/api/auth/proteger', {nome:$('#pnomeC').value, email:$('#pemailC').value, senha:$('#psenhaC').value});
+    S.user = Object.assign({}, S.user, r.usuario); renderMain(); toast('Conta protegida. Agora você pode entrar de qualquer aparelho.');
+  },
+  async formExcluirConta(){
+    if ($('#xconf').value.trim().toUpperCase() !== 'EXCLUIR') throw new Error('Digite EXCLUIR para confirmar.');
+    await api('DELETE', '/api/conta', {confirmar:'EXCLUIR'});
+    closeModal(); logout(); toast('Conta e dados excluídos.');
+  },
   async formPrimeira(){
     if (!validCnpj($('#pcnpj').value)) throw new Error('CNPJ inválido. Confira os 14 números.');
     await api('POST', '/api/empresas', {nome:$('#pnome').value.trim(), cnpj:$('#pcnpj').value, regime:$('#preg').value});
@@ -269,7 +293,7 @@ async function enviar(empresaId, file, tipo, validade){
   const fd = new FormData(); fd.append('file', file, file.name);
   return api('POST', '/api/empresas/' + empresaId + '/documentos?tipo=' + encodeURIComponent(tipo) + (validade ? '&validade=' + validade : ''), fd, true);
 }
-const NOTAS = {};
+const NOTAS = {}, FIN = {}; let FIN_ANO = 0;
 let lerFile = null;
 addFiles = async function(files, tipo){
   const arr = Array.prototype.slice.call(files);
@@ -589,7 +613,7 @@ function barraMei(m, compacto){
   if (!m) return '';
   const pct = Math.min(100, m.percentual), tom = m.situacao === 'ok' ? 'ok' : m.situacao === 'perto' ? 'warn' : 'bad';
   const txt = {ok:'Dentro do limite.', perto:'Perto do limite: acima de 80%.', acima:'Passou do limite (até 20%): vai pagar DAS sobre o excesso e deixa de ser MEI no ano que vem.', acima20:'Passou mais de 20% do limite: o desenquadramento do MEI é retroativo a janeiro. Fale com um contador.'}[m.situacao];
-  return '<div class="meibar ' + tom + '"><div class="meibar-top"><span>Faturamento do MEI em ' + NOTAS[S.empresaId].ano + '</span><b>' + brl(m.usado) + ' de ' + brl(m.limite) + '</b></div>' +
+  return '<div class="meibar ' + tom + '"><div class="meibar-top"><span>Limite do MEI em ' + (FIN_ANO || today().getFullYear()) + '</span><b>' + brl(m.usado) + ' de ' + brl(m.limite) + '</b></div>' +
     '<div class="meibar-trilho" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(pct) + '" aria-label="Uso do limite do MEI"><i style="width:' + pct + '%"></i></div>' +
     '<p class="hint" style="margin:6px 0 0">' + String(m.percentual).replace('.', ',') + '% usado · ' + (m.restante >= 0 ? 'faltam ' + brl(m.restante) : 'passou ' + brl(-m.restante)) + '. ' + txt +
     (m.meses < 12 ? ' Limite proporcional: ' + m.meses + ' meses no ano de abertura.' : '') + (compacto ? '' : ' Conta só as notas de venda registradas aqui.') + '</p></div>';
@@ -600,10 +624,8 @@ function secaoNotas(){
   const R = N.resumo, mesNome = MESES[today().getMonth()].toLowerCase();
   const lista = N.notas.slice(0, 8).map(n => '<div class="docrow"><span class="docicon">' + ic(n.direcao === 'emitida' ? 'chart' : 'wallet') + '</span><div class="grow"><div class="nm">' + esc(n.tipo) + (n.numero ? ' nº ' + esc(n.numero) : '') + ' · ' + esc(n.contraparteNome || fmtDoc(n.contraparteDoc) || (n.direcao === 'emitida' ? 'Venda' : 'Compra')) + '</div><div class="mt">' + (n.direcao === 'emitida' ? 'Venda' : 'Compra') + ' · ' + fmtDate(n.dataEmissao) + '</div></div><b class="nowrap">' + brl(n.valor) + '</b><button class="ib" data-action="rmnota" data-id="' + n.id + '" aria-label="Remover nota">' + ic('trash', 18) + '</button></div>').join('');
   return '<section class="card notas" aria-label="Notas fiscais" style="margin-bottom:20px"><div class="sechead"><h2>Notas fiscais</h2><span class="hint">Envie o XML (melhor) ou o PDF da nota. Vários XML de uma vez também funcionam.</span></div>' +
-    '<div class="kpis kpis3"><div class="card kpi"><span class="kicon ok">' + ic('chart', 24) + '</span><div><div class="klabel">Vendas em ' + mesNome + '</div><div class="kval">' + brl(R.emitidas.mes) + '</div></div></div>' +
-    '<div class="card kpi"><span class="kicon brand">' + ic('calendar', 24) + '</span><div><div class="klabel">Vendas em ' + N.ano + '</div><div class="ksub">' + R.emitidas.qtd + (R.emitidas.qtd === 1 ? ' nota' : ' notas') + '</div><div class="kval">' + brl(R.emitidas.total) + '</div></div></div>' +
-    '<div class="card kpi"><span class="kicon neutro">' + ic('wallet', 24) + '</span><div><div class="klabel">Compras em ' + N.ano + '</div><div class="ksub">' + R.recebidas.qtd + (R.recebidas.qtd === 1 ? ' nota' : ' notas') + '</div><div class="kval">' + brl(R.recebidas.total) + '</div></div></div></div>' +
-    barraMei(N.mei) + (lista ? '<div style="margin-top:14px">' + lista + '</div>' : '<p class="hint" style="margin-top:12px">Nenhuma nota registrada ainda.</p>') + '</section>';
+    '<p class="sub" style="margin:0">' + N.ano + ': <b>' + brl(R.emitidas.total) + '</b> em vendas (' + R.emitidas.qtd + (R.emitidas.qtd === 1 ? ' nota' : ' notas') + ') e <b>' + brl(R.recebidas.total) + '</b> em compras. <a href="#inicio">Ver faturamento e impostos</a></p>' +
+    (lista ? '<div style="margin-top:14px">' + lista + '</div>' : '<p class="hint" style="margin-top:12px">Nenhuma nota registrada ainda.</p>') + '</section>';
 }
 const _rmNotas = renderMain;
 renderMain = function(){
@@ -615,7 +637,76 @@ renderMain = function(){
     const inp = $('#fileDoc'); if (inp) inp.setAttribute('accept', '.pdf,.xml,.png,.jpg,.jpeg,.csv,.txt,.xlsx');
   }
   if (ui.page === 'inicio') {
-    const N = NOTAS[S.empresaId], k = $('#main .kpis3');
-    if (N && N.mei && k) k.insertAdjacentHTML('afterend', '<section class="card" style="margin-top:16px">' + barraMei(N.mei, true) + '</section>');
+    const k = $('#main .kpis3');
+    if (k) k.insertAdjacentHTML('afterend', secaoDinheiro());
   }
+};
+
+/* ---------- Conta e privacidade (LGPD) ---------- */
+ACT['tentar-de-novo'] = () => { iniciar(); };
+ACT['baixar-dados'] = rodar(async () => {
+  const r = await fetch('/api/conta/exportar', {headers:{authorization:'Bearer ' + token}});
+  if (!r.ok) throw new Error('Não foi possível gerar o arquivo.');
+  const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
+  a.href = url; a.download = 'fiscofacil-meus-dados.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Arquivo com os seus dados baixado.');
+});
+ACT['excluir-conta'] = () => {
+  $('#modal').innerHTML = '<div class="overlay" data-overlay><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mt" tabindex="-1"><div class="mhead"><h2 id="mt">Excluir conta e dados</h2><button class="ib" data-action="fechar" aria-label="Fechar">' + ic('x') + '</button></div>' +
+    '<form id="formExcluirConta" class="form"><p class="sub" style="margin:0">Apaga para sempre a conta, as empresas, guias, notas fiscais e arquivos enviados. Não tem como desfazer.</p>' +
+    field('xconf', 'Digite EXCLUIR para confirmar', '<input id="xconf" class="in" autocomplete="off">') +
+    '<p class="err" id="ferr" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-action="fechar">Cancelar</button><button class="btn danger" type="submit">Excluir tudo</button></div></form></div></div>';
+  const i = $('#xconf'); if (i) i.focus();
+};
+function contaSec(){
+  const u = S.user || {};
+  const proteger = u.anonimo ? '<div class="contabox"><h3>Proteja sua conta</h3><p class="sub" style="margin:0 0 10px">Hoje os dados estão ligados só a este navegador. Com e-mail e senha você entra de qualquer aparelho e não perde nada se limpar o navegador.</p>' +
+    '<form id="formProteger" class="form"><div class="formrow">' + field('pnomeC', 'Seu nome', '<input id="pnomeC" class="in" autocomplete="name" required>') + field('pemailC', 'E-mail', '<input id="pemailC" type="email" class="in" autocomplete="email" required>') + '</div>' +
+    field('psenhaC', 'Senha (mínimo 8 caracteres)', '<input id="psenhaC" type="password" class="in" autocomplete="new-password" required minlength="8">') +
+    '<p class="err" id="ferr" role="alert"></p><div class="actions" style="justify-content:flex-start"><button class="btn primary" type="submit">Salvar e-mail e senha</button></div></form></div>' : '';
+  return sec('cd', 'Conta e privacidade', '<p class="sub" style="margin:0 0 12px">' + (u.anonimo ? 'Você está usando sem cadastro.' : 'Conectado como <b>' + esc(u.email || '') + '</b>.') + ' Só a sua conta vê as empresas, guias, notas e arquivos cadastrados aqui.</p>' + proteger +
+    '<div class="actions" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn ghost" data-action="baixar-dados">Baixar meus dados</button>' + (u.anonimo ? '' : '<button class="btn ghost" data-action="sair">Sair</button>') +
+    '<button class="btn ghost dangertxt" data-action="excluir-conta">Excluir conta e dados</button></div><p class="hint" style="margin-top:10px"><a href="/privacidade.html" target="_blank" rel="noopener">Política de privacidade (LGPD)</a></p>');
+}
+
+/* ---------- Para onde vai o dinheiro: faturamento e impostos por tipo ---------- */
+const NOME_IMP = {icms:'ICMS', ipi:'IPI', pis:'PIS', cofins:'COFINS', iss:'ISS'};
+function secaoDinheiro(){
+  const F = FIN[S.empresaId];
+  if (!F) return '';
+  const f = F.faturamento, maxMes = Math.max.apply(null, f.porMes.concat([1])), mesAtual = F.ano === today().getFullYear() ? today().getMonth() : 11;
+  const barras = '<div class="mesbars" role="img" aria-label="Faturamento por mês em ' + F.ano + '">' + f.porMes.map((v, i) => '<div class="mb' + (i > mesAtual ? ' futuro' : '') + '" title="' + MESES[i] + ': ' + brl(v) + '"><i style="height:' + (v ? Math.max(4, Math.round(v / maxMes * 100)) : 0) + '%"></i><span>' + MESES[i].slice(0, 1) + '</span></div>').join('') + '</div>';
+  const totImp = F.impostos.reduce((t, i) => t + i.pago + i.emAberto, 0) || 1;
+  const imp = F.impostos.length ? '<ul class="implist">' + F.impostos.map(i => '<li><div class="implinha"><span>' + esc(TRIB[i.tributo] || i.tributo) + '</span><b>' + brl(i.pago) + '</b></div>' +
+      '<div class="imptrilho"><i class="pago" style="width:' + (i.pago / totImp * 100) + '%"></i><i class="aberto" style="width:' + (i.emAberto / totImp * 100) + '%"></i></div>' +
+      '<span class="hint">' + i.guias + (i.guias === 1 ? ' guia' : ' guias') + (i.emAberto ? ' · ' + brl(i.emAberto) + ' em aberto' : '') + '</span></li>').join('') + '</ul>'
+    : '<p class="hint">Nenhuma guia paga ou em aberto em ' + F.ano + '. Ao registrar pagamentos em Guias, eles aparecem aqui separados por imposto.</p>';
+  const dest = Object.keys(F.destacadosNasNotas || {}).filter(k => F.destacadosNasNotas[k]);
+  const carga = F.cargaTributaria != null && F.impostosPagos > 0 ? '<div class="carga"><span class="klabel">Impostos pagos sobre o faturamento</span><b>' + String(F.cargaTributaria).replace('.', ',') + '%</b><span class="hint">' + brl(F.impostosPagos) + ' pagos de ' + brl(f.total) + ' faturados</span></div>' : '';
+  return '<section class="card dinheiro" aria-labelledby="dh" style="margin-top:16px"><div class="chead"><h2 id="dh">Faturamento e impostos</h2><div class="anosel"><button class="ib" data-action="fin-ano" data-d="-1" aria-label="Ano anterior">' + ic('left', 18) + '</button><b>' + F.ano + '</b><button class="ib" data-action="fin-ano" data-d="1" aria-label="Próximo ano"' + (F.ano >= today().getFullYear() ? ' disabled' : '') + '>' + ic('right', 18) + '</button></div></div>' +
+    '<div class="dgrid"><div><div class="klabel">Faturamento em ' + F.ano + '</div><div class="kval big">' + brl(f.total) + '</div>' +
+      '<p class="hint" style="margin:4px 0 0">' + brl(f.comNota) + ' com nota' + (f.semNota ? ' · ' + brl(f.semNota) + ' sem nota' : '') + ' · compras ' + brl(F.compras) + '</p>' + barras +
+      '<button class="btn ghost sm" data-action="venda-sem-nota" style="margin-top:12px">' + ic('plus', 16) + 'Registrar venda sem nota</button>' + barraMei(F.mei, true) + '</div>' +
+    '<div><div class="klabel">Para onde vão os impostos</div>' + carga + imp +
+      (dest.length ? '<p class="hint" style="margin-top:8px">Destacado nas notas de venda: ' + dest.map(k => (NOME_IMP[k] || k.toUpperCase()) + ' ' + brl(F.destacadosNasNotas[k])).join(' · ') + '. No Simples e no MEI esses valores já estão dentro do DAS.</p>' : '') + '</div></div>' +
+    '<p class="hint" style="margin-top:12px">Calculado com as notas e guias registradas aqui. Para o faturamento ficar completo, envie todas as notas de venda e registre as vendas sem nota.</p></section>';
+}
+ACT['fin-ano'] = rodar(async el => {
+  FIN_ANO = FIN_ANO + Number(el.dataset.d);
+  FIN[S.empresaId] = await api('GET', '/api/empresas/' + S.empresaId + '/financeiro?ano=' + FIN_ANO); renderMain();
+});
+ACT['venda-sem-nota'] = () => {
+  $('#modal').innerHTML = '<div class="overlay" data-overlay><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mt" tabindex="-1"><div class="mhead"><h2 id="mt">Venda sem nota</h2><button class="ib" data-action="fechar" aria-label="Fechar">' + ic('x') + '</button></div>' +
+    '<form id="formSemNota" class="form"><p class="sub" style="margin:0">O MEI pode vender a pessoa física sem emitir nota, mas o valor conta no faturamento. Pode lançar o total do mês de uma vez.</p>' +
+    '<div class="formrow">' + field('sdata', 'Data (ou último dia do mês)', '<input id="sdata" type="date" class="in" value="' + iso(today()) + '" max="' + iso(today()) + '">') + field('svalor', 'Valor (R$)', '<input id="svalor" class="in" inputmode="decimal">') + '</div>' +
+    field('sdesc', 'Descrição (opcional)', '<input id="sdesc" class="in" maxlength="120" placeholder="Ex.: vendas no balcão de outubro">') +
+    '<p class="err" id="ferr" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-action="fechar">Cancelar</button><button class="btn primary" type="submit">Registrar</button></div></form></div></div>';
+  const i = $('#svalor'); if (i) i.focus();
+};
+SUB.formSemNota = async function(){
+  const data = $('#sdata').value, valor = parseMoney($('#svalor').value);
+  if (!data) throw new Error('Informe a data.');
+  if (!(valor > 0)) throw new Error('Informe um valor maior que zero.');
+  await api('POST', '/api/empresas/' + S.empresaId + '/notas', {tipo:'Venda sem nota', dataEmissao:data, direcao:'emitida', valor:Math.round(valor * 100) / 100, contraparteNome:$('#sdesc').value.trim() || null});
+  await refresh('Venda registrada no faturamento.');
 };

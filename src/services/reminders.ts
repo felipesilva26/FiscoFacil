@@ -15,7 +15,7 @@ export async function runReminders(ctx: Ctx, soUsuario?: string): Promise<{ envi
        join empresas e on e.id = o.empresa_id
        join users u on u.id = e.user_id
        left join config_lembretes c on c.user_id = u.id
-      where o.pago_em is null and o.arquivado = false ${soUsuario ? 'and u.id = $1' : ''}
+      where o.pago_em is null and o.arquivado = false and u.anonimo = false ${soUsuario ? 'and u.id = $1' : ''}
       order by o.venc`,
     soUsuario ? [soUsuario] : [],
   );

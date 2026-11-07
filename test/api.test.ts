@@ -21,19 +21,19 @@ describe('CNPJ', () => {
 
 describe('autenticação', () => {
   test('cadastro, login e /me; senha errada e e-mail repetido são recusados', async () => {
-    const r = await t.app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome: 'Bia', email: 'bia@teste.com', senha: 'senha-forte-123' } });
+    const r = await t.app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome: 'Bia', email: 'bia@teste.com', senha: 'senha-forte-123', aceite: true } });
     assert.equal(r.statusCode, 201);
-    const dup = await t.app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome: 'Bia', email: 'bia@teste.com', senha: 'senha-forte-123' } });
+    const dup = await t.app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome: 'Bia', email: 'bia@teste.com', senha: 'senha-forte-123', aceite: true } });
     assert.equal(dup.statusCode, 409);
     const ruim = await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'bia@teste.com', senha: 'errada' } });
     assert.equal(ruim.statusCode, 401);
-    const ok = await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'bia@teste.com', senha: 'senha-forte-123' } });
+    const ok = await t.app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'bia@teste.com', senha: 'senha-forte-123', aceite: true } });
     const me = await t.app.inject({ method: 'GET', url: '/api/auth/me', headers: { authorization: `Bearer ${ok.json().token}` } });
     assert.equal(me.json().email ?? me.json().usuario?.email, 'bia@teste.com');
   });
   test('sem token ou senha curta é recusado', async () => {
     assert.equal((await t.app.inject({ method: 'GET', url: '/api/empresas' })).statusCode, 401);
-    const r = await t.app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome: 'X', email: 'x@teste.com', senha: '123' } });
+    const r = await t.app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome: 'X', email: 'x@teste.com', senha: '123', aceite: true } });
     assert.equal(r.statusCode, 400);
   });
 });

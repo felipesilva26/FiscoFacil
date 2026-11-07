@@ -30,7 +30,7 @@ export async function criar(opts: { agora?: string; fetchImpl?: typeof fetch; li
 
 let n = 0;
 export async function cadastrar(app: FastifyInstance, nome = 'Ana') {
-  const r = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome, email: `u${++n}@teste.com`, senha: 'senha-forte-123' } });
+  const r = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { nome, email: `u${++n}@teste.com`, senha: 'senha-forte-123', aceite: true } });
   const j = r.json();
   return { token: j.token as string, h: { authorization: `Bearer ${j.token}` } };
 }

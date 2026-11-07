@@ -19,6 +19,8 @@ export interface Config {
   databaseSchema?: string;
   /** Versão de teste: cada navegador ganha uma conta anônima, sem tela de login. */
   semLogin: boolean;
+  privacidadeResponsavel: string;
+  privacidadeContato: string;
   dataDir: string;
   storageDir: string;
   jwtSecret: string;
@@ -57,6 +59,8 @@ export function loadConfig(env: Env = process.env): Config {
     databaseUrl: e('DATABASE_URL') || undefined,
     databaseSchema: e('DATABASE_SCHEMA') || undefined,
     semLogin: e('SEM_LOGIN') === '1',
+    privacidadeResponsavel: e('PRIVACIDADE_RESPONSAVEL') || 'Richards Felipe do Carmo',
+    privacidadeContato: e('PRIVACIDADE_CONTATO') || '',
     dataDir: e('DATA_DIR') || './data/pgdata',
     storageDir: e('STORAGE_DIR') || './data/arquivos',
     jwtSecret: secret || 'chave-somente-para-desenvolvimento-nao-use-em-producao',

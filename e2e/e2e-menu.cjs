@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
   const b = await chromium.launch(); const errs = []; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA') + ' ' + m); if (!c) process.exitCode = 1; };
   for (const [nome, w, h, mob] of [['d', 1280, 900, false], ['t', 768, 1024, true], ['m', 390, 844, true]]) {
     const ctx = await b.newContext({ viewport: { width: w, height: h }, isMobile: mob && w < 500, hasTouch: mob }); const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nome + ': ' + e.message));
-    await p.goto('http://localhost:3111/'); await p.waitForSelector('#formOnbCnpj', { timeout: 15000 });
+    await p.goto('http://localhost:3111/'); await p.waitForSelector('#formAnonimo', { timeout: 15000 }); await p.check('#aaceite'); await p.click('#formAnonimo button[type=submit]'); await p.waitForSelector('#formOnbCnpj', { timeout: 15000 });
     await p.fill('#ocnpj', '11222333000181'); await p.click('#formOnbCnpj button[type=submit]'); await p.waitForSelector('#formOnbConfirmar'); await p.click('#formOnbConfirmar button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#main').textContent.includes('Conferido automaticamente'), null, { timeout: 15000 });
     const t = await p.textContent('#main');
@@ -21,7 +21,7 @@ const { chromium } = require('playwright');
     ok((await p.textContent('#main')).includes('Situação da empresa'), nome + ': link antigo #situacao abre o Início');
     await p.goto('http://localhost:3111/#configuracoes'); await p.waitForTimeout(400);
     const c = await p.textContent('#main');
-    ok(!c.includes('Integração com a Receita Federal') && !c.includes('Seu nome'), nome + ': Configurações sem seções repetidas');
+    ok(!c.includes('Integração com a Receita Federal') && !c.includes('Perfil'), nome + ': Configurações sem seções repetidas');
     const over = await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     ok(!over, nome + ': sem rolagem lateral');
     await ctx.close();

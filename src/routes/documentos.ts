@@ -1,8 +1,9 @@
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { unlink } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Ctx } from '../ctx.js';
+import { guardarArquivo, lerArquivo } from '../services/arquivos.js';
 import { auditar, empresaDoUsuario } from '../services/dominio.js';
 import { lerDocumento } from '../services/leitor.js';
 import { lerNotaTexto, lerNotaXml, pareceTextoDeNota, pareceXmlDeNota } from '../services/notafiscal.js';
@@ -22,7 +23,7 @@ const MAGIC: Record<string, number[]> = {
 const limpaNome = (n: string) => basename(n).replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_').slice(0, 200) || 'arquivo';
 const dono = async (ctx: Ctx, userId: string, id: string) => {
   const { rows } = await ctx.db.query(
-    'select d.* from documentos d join empresas e on e.id = d.empresa_id where d.id = $1 and e.user_id = $2', [id, userId]);
+    'select d.id, d.empresa_id, d.nome, d.tipo, d.tamanho, d.arquivo, d.data, d.validade from documentos d join empresas e on e.id = d.empresa_id where d.id = $1 and e.user_id = $2', [id, userId]);
   return rows[0] ?? null;
 };
 const toDoc = (r: Record<string, any>) => ({ id: r.id, empresaId: r.empresa_id, nome: r.nome, tipo: r.tipo, tamanho: r.tamanho, data: r.data, validade: r.validade ?? null });
@@ -33,7 +34,7 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
   app.get('/api/empresas/:id/documentos', { preHandler: guard }, async (req, reply) => {
     const id = (req.params as { id: string }).id;
     if (!(await empresaDoUsuario(ctx, req.userId, id))) return reply.code(404).send({ erro: 'Empresa não encontrada.' });
-    const { rows } = await ctx.db.query('select * from documentos where empresa_id = $1 order by criado_em desc', [id]);
+    const { rows } = await ctx.db.query('select id, empresa_id, nome, tipo, tamanho, data, validade from documentos where empresa_id = $1 order by criado_em desc', [id]);
     return rows.map(toDoc);
   });
 
@@ -52,17 +53,9 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
     const magic = MAGIC[ext];
     if (magic && !magic.every((b, i) => buf[i] === b)) return reply.code(415).send({ erro: 'O conteúdo do arquivo não corresponde à extensão.' });
 
-    const docId = newId();
-    const pasta = join(ctx.cfg.storageDir, id);
-    await mkdir(pasta, { recursive: true });
-    const arquivo = join(pasta, `${docId}.bin`);
-    await writeFile(arquivo, buf);
-    await ctx.db.query(
-      'insert into documentos (id, empresa_id, nome, tipo, tamanho, arquivo, data, validade) values ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [docId, id, nome, tipo, buf.length, arquivo, todayISO(ctx.now()), validade ?? null],
-    );
+    const docId = await guardarArquivo(ctx, id, { nome, tipo, buf, validade });
     await auditar(ctx, req.userId, id, 'documento.enviar', { id: docId, tipo });
-    const { rows } = await ctx.db.query('select * from documentos where id = $1', [docId]);
+    const { rows } = await ctx.db.query('select id, empresa_id, nome, tipo, tamanho, data, validade from documentos where id = $1', [docId]);
     return reply.code(201).send(toDoc(rows[0]));
   });
 
@@ -123,8 +116,8 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
     const d = await dono(ctx, req.userId, (req.params as { id: string }).id);
     if (!d) return reply.code(404).send({ erro: 'Documento não encontrado.' });
     const ext = extname(d.nome).slice(1).toLowerCase();
-    let conteudo: Buffer;
-    try { conteudo = await readFile(d.arquivo); } catch { return reply.code(410).send({ erro: 'O arquivo não está mais disponível.' }); }
+    const conteudo = await lerArquivo(ctx, d);
+    if (!conteudo) return reply.code(410).send({ erro: 'O arquivo não está mais disponível.' });
     return reply
       .header('content-type', MIME[ext] ?? 'application/octet-stream')
       .header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(d.nome)}`)
@@ -136,7 +129,7 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
     const d = await dono(ctx, req.userId, (req.params as { id: string }).id);
     if (!d) return reply.code(404).send({ erro: 'Documento não encontrado.' });
     await ctx.db.query('delete from documentos where id = $1', [d.id]);
-    await unlink(d.arquivo).catch(() => undefined);
+    if (d.arquivo) await unlink(d.arquivo).catch(() => undefined);
     await auditar(ctx, req.userId, d.empresa_id, 'documento.excluir', { id: d.id });
     return reply.code(204).send();
   });

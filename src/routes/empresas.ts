@@ -1,3 +1,4 @@
+import { unlink } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CnpjError, formatCnpj, lookupCnpj, onlyDigits, validCnpj, nomeSugerido, regimePelaReceita } from '../cnpj.js';
@@ -77,6 +78,8 @@ export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {
   app.delete('/api/empresas/:id', { preHandler: guard }, async (req, reply) => {
     const id = (req.params as { id: string }).id;
     if (!(await empresaDoUsuario(ctx, req.userId, id))) return reply.code(404).send(naoAchou);
+    const { rows: arqs } = await ctx.db.query("select arquivo from documentos where empresa_id = $1 and arquivo <> ''", [id]);
+    for (const a of arqs) await unlink(a.arquivo).catch(() => undefined);
     await ctx.db.query('delete from empresas where id = $1', [id]);
     await auditar(ctx, req.userId, null, 'empresa.excluir', { empresaId: id });
     return reply.code(204).send();

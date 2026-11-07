@@ -252,3 +252,31 @@ h1{letter-spacing:-.018em}
 .notas .sechead{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
 .notas .sechead h2{margin:0}
 .nowrap{white-space:nowrap}
+
+/* Faturamento e impostos */
+.dinheiro .chead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.anosel{display:flex;align-items:center;gap:6px}
+.anosel .ib[disabled]{opacity:.35;pointer-events:none}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+@container app (max-width:760px){.dgrid{grid-template-columns:1fr;gap:20px}}
+.kval.big{font-size:30px;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+.mesbars{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;height:96px;margin-top:14px;align-items:end}
+.mb{display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:4px}
+.mb i{display:block;width:100%;max-width:22px;border-radius:4px 4px 0 0;background:var(--brand,#2f5bea)}
+.mb.futuro i{opacity:.25}
+.mb span{font-size:11px;color:var(--muted,#64748b)}
+.carga{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:12px 14px;border-radius:12px;background:var(--surface-2,#f1f5f9);margin:8px 0 12px}
+.carga b{font-size:22px}
+.implist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.implinha{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.imptrilho{display:flex;height:8px;border-radius:99px;background:var(--line,#e5e7eb);overflow:hidden;margin:6px 0 3px}
+.imptrilho .pago{background:var(--brand,#2f5bea)}
+.imptrilho .aberto{background:var(--warn,#b45309);opacity:.6}
+/* Conta e privacidade */
+.check.aceite{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45}
+.check.aceite input{margin-top:3px;flex:none;width:18px;height:18px}
+.contabox{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:14px;margin-bottom:14px}
+.contabox h3{margin:0 0 4px;font-size:16px}
+.dangertxt{color:var(--bad,#b91c1c)}
+.authpriv{margin-top:auto;font-size:13px;opacity:.8}
+.authpriv a{color:inherit}

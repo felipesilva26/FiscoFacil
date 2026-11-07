@@ -1,11 +1,11 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Cadastral } from '../cnpj.js';
 import { onlyDigits } from '../cnpj.js';
 import type { Ctx } from '../ctx.js';
 import type { Row } from '../db.js';
+import { guardarArquivo } from '../services/arquivos.js';
 import { ehMei } from '../services/dasmei.js';
 import { auditar, empresaDoUsuario } from '../services/dominio.js';
 import { chaveValida, lerNotaXml, limiteMei, pareceXmlDeNota } from '../services/notafiscal.js';
@@ -14,7 +14,7 @@ import { makeGuard } from './guard.js';
 
 const nova = z.object({
   documentoId: z.string().optional(),
-  tipo: z.enum(['NF-e', 'NFC-e', 'NFS-e', 'Nota fiscal']),
+  tipo: z.enum(['NF-e', 'NFC-e', 'NFS-e', 'Nota fiscal', 'Venda sem nota']),
   chave: z.string().regex(/^\d{44}$|^\d{50}$/).nullable().optional(),
   numero: z.string().trim().max(20).nullable().optional(),
   serie: z.string().trim().max(5).nullable().optional(),
@@ -47,6 +47,15 @@ async function inserir(ctx: Ctx, empresaId: string, b: z.infer<typeof nova>): Pr
   return { nota: toNota(rows[0]), repetida: false };
 }
 
+const r2 = (v: number) => Math.round(v * 100) / 100;
+/** Faturamento do MEI contra o limite do ano. Até 20% acima: paga DAS sobre o excesso e vira ME no ano seguinte; acima disso, o desenquadramento é retroativo. */
+function situacaoMei(e: Row, ano: number, usado: number) {
+  const c = e.cadastral as Cadastral | null;
+  const { limite, meses } = limiteMei(ano, c?.meiDesde ?? c?.abertura);
+  return { limite, meses, usado, restante: r2(limite - usado), percentual: limite ? Math.round((usado / limite) * 1000) / 10 : 0,
+    situacao: usado > limite * 1.2 ? 'acima20' : usado > limite ? 'acima' : usado > limite * 0.8 ? 'perto' : 'ok' };
+}
+
 export async function notasRoutes(app: FastifyInstance, ctx: Ctx) {
   const guard = makeGuard(ctx.cfg);
   const naoAchou = { erro: 'Empresa não encontrada.' };
@@ -65,16 +74,41 @@ export async function notasRoutes(app: FastifyInstance, ctx: Ctx) {
     const recebidas = doAno.filter((n) => n.direcao === 'recebida');
     const mes = hoje.slice(0, 7);
     const porMes = Array.from({ length: 12 }, (_, i) => soma(emitidas.filter((n) => n.dataEmissao.slice(5, 7) === String(i + 1).padStart(2, '0'))));
-    let mei = null;
-    if (ehMei(e)) {
-      const c = e.cadastral as Cadastral | null;
-      const { limite, meses } = limiteMei(ano, c?.meiDesde ?? c?.abertura);
-      const usado = soma(emitidas);
-      mei = { limite, meses, usado, restante: Math.round((limite - usado) * 100) / 100, percentual: limite ? Math.round((usado / limite) * 1000) / 10 : 0,
-        // Até 20% acima: paga DAS sobre o excesso e vira ME no ano seguinte; acima disso, o desenquadramento é retroativo.
-        situacao: usado > limite * 1.2 ? 'acima20' : usado > limite ? 'acima' : usado > limite * 0.8 ? 'perto' : 'ok' };
-    }
+    const mei = ehMei(e) ? situacaoMei(e, ano, soma(emitidas)) : null;
     return { ano, notas, resumo: { emitidas: { qtd: emitidas.length, total: soma(emitidas), mes: soma(emitidas.filter((n) => n.dataEmissao.startsWith(mes))) }, recebidas: { qtd: recebidas.length, total: soma(recebidas) }, porMes }, mei };
+  });
+
+  /** Para onde vai o dinheiro: faturamento do ano (com e sem nota) e impostos pagos por tipo. */
+  app.get('/api/empresas/:id/financeiro', { preHandler: guard }, async (req, reply) => {
+    const e = await empresaDoUsuario(ctx, req.userId, (req.params as { id: string }).id);
+    if (!e) return reply.code(404).send(naoAchou);
+    const hoje = todayISO(ctx.now());
+    const { ano } = z.object({ ano: z.coerce.number().int().min(2000).max(2100).default(Number(hoje.slice(0, 4))) }).parse(req.query);
+    const a = String(ano);
+    const notas = (await ctx.db.query("select * from notas_fiscais where empresa_id = $1 and data_emissao like $2", [e.id, `${a}-%`])).rows.map(toNota);
+    const vendas = notas.filter((n) => n.direcao === 'emitida');
+    const porMes = Array.from({ length: 12 }, (_, i) => r2(vendas.filter((n) => Number(n.dataEmissao.slice(5, 7)) === i + 1).reduce((t, n) => t + n.valor, 0)));
+    const total = r2(porMes.reduce((t, v) => t + v, 0));
+    const semNota = r2(vendas.filter((n) => n.tipo === 'Venda sem nota').reduce((t, n) => t + n.valor, 0));
+    const compras = r2(notas.filter((n) => n.direcao === 'recebida').reduce((t, n) => t + n.valor, 0));
+    // Guias: pagas no ano (pela data do pagamento) e em aberto com vencimento no ano.
+    const obr = (await ctx.db.query('select tributo, venc, pago_em, valor_centavos from obrigacoes where empresa_id = $1 and arquivado = false and (pago_em like $2 or (pago_em is null and venc like $2))', [e.id, `${a}-%`])).rows;
+    const porTributo = new Map<string, { tributo: string; pago: number; emAberto: number; guias: number }>();
+    for (const o of obr) {
+      const t = porTributo.get(o.tributo) ?? { tributo: o.tributo, pago: 0, emAberto: 0, guias: 0 };
+      if (o.pago_em) t.pago += Number(o.valor_centavos) / 100; else t.emAberto += Number(o.valor_centavos) / 100;
+      t.guias += 1; porTributo.set(o.tributo, t);
+    }
+    const impostos = [...porTributo.values()].map((t) => ({ ...t, pago: r2(t.pago), emAberto: r2(t.emAberto) })).sort((x, y) => y.pago + y.emAberto - (x.pago + x.emAberto));
+    const pagos = r2(impostos.reduce((t, i) => t + i.pago, 0));
+    const destacados: Record<string, number> = {};
+    for (const n of vendas) for (const [k, v] of Object.entries(n.impostos as Record<string, number>)) if (v) destacados[k] = r2((destacados[k] ?? 0) + v);
+    return {
+      ano, faturamento: { total, comNota: r2(total - semNota), semNota, porMes, notas: vendas.length }, compras,
+      impostos, impostosPagos: pagos, impostosEmAberto: r2(impostos.reduce((t, i) => t + i.emAberto, 0)),
+      cargaTributaria: total ? Math.round((pagos / total) * 1000) / 10 : null, destacadosNasNotas: destacados,
+      mei: ehMei(e) ? situacaoMei(e, ano, total) : null,
+    };
   });
 
   app.post('/api/empresas/:id/notas', { preHandler: guard }, async (req, reply) => {
@@ -108,13 +142,7 @@ export async function notasRoutes(app: FastifyInstance, ctx: Ctx) {
       const { rows } = await ctx.db.query('select * from notas_fiscais where empresa_id = $1 and chave = $2', [e.id, n.chave]);
       if (rows.length) return { nota: toNota(rows[0]), repetida: true };
     }
-    const docId = newId();
-    const pasta = join(ctx.cfg.storageDir, e.id);
-    await mkdir(pasta, { recursive: true });
-    const arquivo = join(pasta, `${docId}.bin`);
-    await writeFile(arquivo, buf);
-    await ctx.db.query('insert into documentos (id, empresa_id, nome, tipo, tamanho, arquivo, data) values ($1,$2,$3,$4,$5,$6,$7)',
-      [docId, e.id, basename(parte.filename || 'nota.xml').slice(0, 200), 'Nota fiscal', buf.length, arquivo, todayISO(ctx.now())]);
+    const docId = await guardarArquivo(ctx, e.id, { nome: basename(parte.filename || 'nota.xml').replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_').slice(0, 200), tipo: 'Nota fiscal', buf });
     const outra = n.direcao === 'emitida' ? n.destinatario : n.emitente;
     const r = await inserir(ctx, e.id, { documentoId: docId, tipo: n.tipo, chave: n.chave, numero: n.numero, serie: n.serie, dataEmissao: n.dataEmissao,
       direcao: n.direcao, contraparteDoc: outra.doc, contraparteNome: outra.nome, valor: n.valor, impostos: Object.fromEntries(Object.entries(n.impostos).filter(([, v]) => v != null)) as Record<string, number> });

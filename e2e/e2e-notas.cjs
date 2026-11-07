@@ -13,7 +13,7 @@ const xml = (emit, dest, n, v, d) => `<?xml version="1.0"?><nfeProc xmlns="http:
   fs.writeFileSync('/tmp/e2e/danfe-compra.pdf', await d.save());
   const b = await chromium.launch(); const errs = []; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA') + ' ' + m); if (!c) process.exitCode = 1; };
   const p = await b.newPage({ viewport: { width: 1280, height: 1000 } }); p.on('pageerror', e => errs.push(e.message));
-  await p.goto('http://localhost:3111/'); await p.waitForSelector('#formOnbCnpj', { timeout: 15000 });
+  await p.goto('http://localhost:3111/'); await p.waitForSelector('#formAnonimo', { timeout: 15000 }); await p.check('#aaceite'); await p.click('#formAnonimo button[type=submit]'); await p.waitForSelector('#formOnbCnpj', { timeout: 15000 });
   await p.fill('#ocnpj', MEI); await p.click('#formOnbCnpj button[type=submit]'); await p.waitForSelector('#formOnbConfirmar'); await p.click('#formOnbConfirmar button[type=submit]');
   await p.waitForFunction(() => document.querySelector('#main').textContent.includes('Conferido automaticamente'), null, { timeout: 15000 });
   await p.goto('http://localhost:3111/#documentos'); await p.waitForTimeout(500);
@@ -28,10 +28,10 @@ const xml = (emit, dest, n, v, d) => `<?xml version="1.0"?><nfeProc xmlns="http:
   await p.screenshot({ path: '/tmp/e2e/notas-modal.png' });
   await p.click('#formLer button[type=submit]'); await p.waitForFunction(() => !document.querySelector('#formLer'), null, { timeout: 10000 }); await p.waitForTimeout(500);
   const t = await p.textContent('#main');
-  ok(t.includes('480,00') && t.includes('Faturamento do MEI'), 'compra registrada e barra do limite do MEI aparece');
+  ok(t.includes('480,00') && t.includes('Ver faturamento e impostos'), 'compra registrada na lista de notas');
   await p.screenshot({ path: '/tmp/e2e/notas-docs.png', fullPage: true });
-  await p.goto('http://localhost:3111/#inicio'); await p.waitForTimeout(800);
-  ok((await p.textContent('#main')).includes('Faturamento do MEI'), 'Início mostra o faturamento do MEI contra o limite');
+  await p.goto('http://localhost:3111/#inicio'); await p.waitForFunction(() => document.querySelector('#main').textContent.includes('Faturamento e impostos'), null, { timeout: 10000 }).catch(() => {});
+  ok((await p.textContent('#main')).includes('Limite do MEI'), 'Início mostra o faturamento do MEI contra o limite');
   for (const [w, h, nm] of [[390, 844, 'm'], [768, 1024, 't']]) {
     await p.setViewportSize({ width: w, height: h }); await p.goto('http://localhost:3111/#documentos'); await p.waitForTimeout(500);
     ok(!(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), nm + ': sem rolagem lateral');

@@ -2,8 +2,9 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Ctx } from './ctx.js';
 import { authRoutes } from './routes/auth.js';
@@ -14,21 +15,35 @@ import { mensagemDeErro } from './routes/guard.js';
 import { obrigacoesRoutes } from './routes/obrigacoes.js';
 import { situacaoRoutes } from './routes/situacao.js';
 import { notasRoutes } from './routes/notas.js';
+import { contaRoutes } from './routes/conta.js';
 import { CnpjError } from './cnpj.js';
 import { ReceitaNaoConfigurada } from './receita/provider.js';
+
+const escHtml = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export async function buildApp(ctx: Ctx): Promise<FastifyInstance> {
   const app = Fastify({ logger: ctx.cfg.env === 'test' ? false : { level: 'info', redact: ['req.headers.authorization'] }, bodyLimit: 1_000_000, trustProxy: true });
 
   await app.register(cors, { origin: ctx.cfg.corsOrigin.length ? ctx.cfg.corsOrigin : false, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] });
-  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+  // Limite por IP só na API (página e fontes não contam); escritórios atrás de um mesmo IP têm folga.
+  await app.register(rateLimit, { max: 600, timeWindow: '1 minute', allowList: (req) => !req.url.startsWith('/api/') });
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
 
-  app.addHook('onSend', async (_req, reply) => {
+  // CSP: só roda o script da própria página (pelo hash); nada de fora do site.
+  const pub = resolve(process.cwd(), 'public');
+  const hashes = existsSync(join(pub, 'index.html'))
+    ? [...readFileSync(join(pub, 'index.html'), 'utf8').matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`)
+    : [];
+  const csp = [`default-src 'self'`, `script-src 'self' ${hashes.join(' ')}`.trim(), `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: blob:`, `font-src 'self'`,
+    `connect-src 'self'`, `frame-ancestors 'none'`, `base-uri 'none'`, `form-action 'self'`, `object-src 'none'`].join('; ');
+  app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('x-frame-options', 'DENY');
     reply.header('referrer-policy', 'no-referrer');
-    reply.header('cache-control', 'no-store');
+    reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    reply.header('content-security-policy', csp);
+    if (ctx.cfg.env === 'production') reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');
+    reply.header('cache-control', req.url.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : 'no-store');
   });
 
   app.setErrorHandler((err: unknown, _req, reply) => {
@@ -57,9 +72,19 @@ export async function buildApp(ctx: Ctx): Promise<FastifyInstance> {
   await extrasRoutes(app, ctx);
   await situacaoRoutes(app, ctx);
   await notasRoutes(app, ctx);
+  await contaRoutes(app, ctx);
+
+  // Política de privacidade com o responsável e o contato definidos no servidor.
+  app.get('/privacidade.html', async (_req, reply) => {
+    const arq = resolve(process.cwd(), 'frontend', 'privacidade.html');
+    if (!existsSync(arq)) return reply.code(404).send('Não encontrado');
+    const html = readFileSync(arq, 'utf8')
+      .replaceAll('{{RESPONSAVEL}}', escHtml(ctx.cfg.privacidadeResponsavel))
+      .replaceAll('{{CONTATO}}', ctx.cfg.privacidadeContato ? `<a href="mailto:${escHtml(ctx.cfg.privacidadeContato)}">${escHtml(ctx.cfg.privacidadeContato)}</a>` : 'o responsável pelo projeto');
+    return reply.type('text/html; charset=utf-8').send(html);
+  });
 
   // Tela do FiscoFácil servida pelo próprio backend (mesma origem, sem CORS).
-  const pub = resolve(process.cwd(), 'public');
   if (existsSync(pub)) {
     await app.register(fastifyStatic, { root: pub, wildcard: false });
   }

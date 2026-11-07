@@ -82,5 +82,9 @@ export async function marcarDasMei(ctx: Ctx, e: Row, competencia: string, status
     }
   } else if (rows.length && !rows[0].pago_em) {
     await ctx.db.query('update obrigacoes set pago_em = $1 where id = $2', [hoje, rows[0].id]);
+  } else if (!rows.length && valor > 0) {
+    // Pagamento confirmado pelo dono: vira guia paga, para entrar no total de impostos pagos.
+    await ctx.db.query("insert into obrigacoes (id, empresa_id, tributo, venc, valor_centavos, codigo, origem, pago_em) values ($1, $2, 'DAS', $3, $4, '', 'manual', $5)",
+      [newId(), e.id, venc, Math.round(valor * 100), venc < hoje ? venc : hoje]);
   }
 }

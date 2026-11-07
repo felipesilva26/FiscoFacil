@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacidade e LGPD · FiscoFácil</title>
+<meta name="description" content="Como o FiscoFácil trata os seus dados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).">
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#141a33;--muted:#5b6380;--line:#e3e7f0;--brand:#2f5bea}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1226;--card:#151b35;--ink:#e8ebf7;--muted:#a3aac4;--line:#262e52;--brand:#7fa2ff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px}
+h1{font-size:28px;line-height:1.2;margin:0 0 6px}h2{font-size:18px;margin:28px 0 6px}
+p,li{color:var(--ink)}.muted{color:var(--muted);font-size:14px}a{color:var(--brand)}
+ul{padding-left:20px}li{margin:4px 0}table{width:100%;border-collapse:collapse;font-size:14px}td,th{border-top:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+</style>
+</head>
+<body>
+<main><div class="card">
+<p class="muted"><a href="/">← Voltar ao FiscoFácil</a></p>
+<h1>Privacidade e proteção de dados</h1>
+<p class="muted">Última atualização: 7 de novembro de 2026. Segue a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).</p>
+
+<h2>Quem é o responsável</h2>
+<p>O FiscoFácil é um projeto acadêmico mantido por {{RESPONSAVEL}}, que é o controlador dos dados tratados aqui. Contato para assuntos de privacidade (encarregado): {{CONTATO}}.</p>
+
+<h2>Quais dados usamos e para quê</h2>
+<table>
+<tr><th>Dado</th><th>Para quê</th><th>Base legal (LGPD)</th></tr>
+<tr><td>Nome, e-mail e senha (guardada só como código irreversível, scrypt)</td><td>Criar a conta e entrar</td><td>Execução de contrato (art. 7º, V)</td></tr>
+<tr><td>CNPJ e dados cadastrais públicos da empresa (Receita Federal) e da dívida ativa (PGFN)</td><td>Mostrar a situação fiscal</td><td>Dados tornados públicos (art. 7º, §§ 3º e 4º) e execução de contrato</td></tr>
+<tr><td>Guias, pagamentos, notas fiscais, valores de faturamento e arquivos que você envia</td><td>Controlar vencimentos, faturamento e impostos</td><td>Execução de contrato (art. 7º, V)</td></tr>
+<tr><td>Registro de ações na conta (o que foi criado, lido ou excluído e quando)</td><td>Segurança e investigação de uso indevido</td><td>Legítimo interesse (art. 7º, IX)</td></tr>
+</table>
+<p>Não vendemos dados, não usamos para publicidade e não fazemos perfil de comportamento. O sistema não usa cookies; o navegador guarda só a chave de acesso à sua conta.</p>
+
+<h2>Separação entre contas</h2>
+<p>Cada empresa pertence a uma única conta. Guias, notas, arquivos e alertas só são lidos e alterados pela conta dona da empresa; o servidor confere isso a cada pedido. Se duas pessoas cadastrarem o mesmo CNPJ, cada uma vê só o que ela mesma registrou. Os únicos dados em comum são os públicos (cadastro na Receita e lista de dívida ativa da PGFN).</p>
+
+<h2>Com quem os dados são compartilhados</h2>
+<ul>
+<li><b>Consulta de CNPJ</b> (BrasilAPI, Minha Receita e CNPJ.ws, que republicam os dados abertos da Receita): recebem só o número do CNPJ consultado.</li>
+<li><b>PGFN</b>: a base de dívida ativa é baixada e conferida no nosso servidor; nada é enviado para a PGFN.</li>
+<li><b>Hospedagem</b> (Render, com servidores nos Estados Unidos): guarda o banco de dados. Essa transferência internacional segue o art. 33 da LGPD, com cláusulas contratuais de proteção do provedor.</li>
+<li><b>E-mail de aviso</b> e <b>assistente com IA</b>: só quando estiverem ligados no servidor. Recebem apenas o necessário para a mensagem ou a resposta.</li>
+</ul>
+
+<h2>Por quanto tempo guardamos</h2>
+<ul>
+<li>Enquanto a conta existir. Ao excluir a conta, tudo é apagado na hora, inclusive os arquivos.</li>
+<li>Contas usadas <b>sem cadastro</b> e paradas há 90 dias são apagadas automaticamente.</li>
+<li>O registro de ações é apagado depois de 1 ano. Alertas já lidos, depois de 6 meses.</li>
+</ul>
+
+<h2>Seus direitos</h2>
+<p>Em <b>Configurações › Conta e privacidade</b> você pode, sozinho e na hora:</p>
+<ul>
+<li><b>Baixar meus dados</b>: um arquivo com tudo o que está na sua conta (acesso e portabilidade, art. 18, II e V).</li>
+<li><b>Corrigir</b> nome, empresas, guias e notas a qualquer momento (art. 18, III).</li>
+<li><b>Excluir conta e dados</b> (eliminação, art. 18, VI).</li>
+</ul>
+<p>Para outros pedidos (informação sobre compartilhamento, revogação, reclamação), fale com {{CONTATO}}. Você também pode procurar a Autoridade Nacional de Proteção de Dados (<a href="https://www.gov.br/anpd" rel="noopener">gov.br/anpd</a>).</p>
+
+<h2>Segurança</h2>
+<ul>
+<li>Conexão sempre criptografada (HTTPS).</li>
+<li>Senhas guardadas só como código irreversível.</li>
+<li>Arquivos guardados no banco de dados, acessíveis só pela conta dona.</li>
+<li>Limite de tentativas de acesso.</li>
+<li>Nunca pedimos senha do gov.br nem certificado digital pela tela.</li>
+</ul>
+<p>Em caso de incidente que possa trazer risco, avisaremos os titulares e a ANPD (art. 48).</p>
+
+<h2>Importante</h2>
+<p>O FiscoFácil ajuda a organizar, mas não substitui o contador nem os sistemas oficiais (Receita Federal, PGMEI, e-CAC). Não é destinado a menores de 18 anos.</p>
+</div></main>
+</body>
+</html>

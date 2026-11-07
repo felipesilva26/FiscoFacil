@@ -11,6 +11,7 @@ import { ConsoleNotifier, SmtpNotifier } from './services/notifier.js';
 import { runReminders } from './services/reminders.js';
 import { atualizarCadastrosAntigos } from './services/situacao.js';
 import { agendarPgfn, rodarPgfn } from './pgfn/importador.js';
+import { limparDadosAntigos } from './routes/conta.js';
 
 const cfg = loadConfig();
 const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir, schema: cfg.databaseSchema });
@@ -28,6 +29,7 @@ const timer = setInterval(() => {
   // Dívida ativa (PGFN): de madrugada, só quando há trimestre novo ou CNPJ ainda não conferido.
   const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
   if (hora === 3 && process.env.PGFN_DESLIGADO !== '1') void rodarPgfn(ctx);
+  if (hora === 4) limparDadosAntigos(ctx).then((r) => r.contas && app.log.info(r, 'retenção: contas sem cadastro inativas removidas')).catch((e) => app.log.error(e));
 }, 60 * 60 * 1000);
 timer.unref();
 
