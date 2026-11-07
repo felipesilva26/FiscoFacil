@@ -1,9 +1,6 @@
-import { createWriteStream } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import yauzl from 'yauzl';
+import unzipper from 'unzipper';
 import { onlyDigits } from '../cnpj.js';
 import type { Ctx } from '../ctx.js';
 import { newId } from '../util.js';
@@ -155,6 +152,21 @@ export async function filtrarZip(arquivo: string, procurados: Set<string>) {
   return { linhas, achados };
 }
 
+/** Lê o zip direto do download, sem gravar em disco (os arquivos da PGFN são grandes). */
+export async function filtrarZipStream(src: Readable, procurados: Set<string>) {
+  let linhas = 0;
+  const achados: Inscricao[] = [];
+  const parser = src.pipe(unzipper.Parse({ forceStream: true }));
+  for await (const item of parser) {
+    const entry = item as unzipper.Entry;
+    if (/\.(csv|txt)$/i.test(entry.path)) {
+      const r = await filtrarCsv(entry, procurados);
+      linhas += r.linhas; achados.push(...r.achados);
+    } else entry.autodrain();
+  }
+  return { linhas, achados };
+}
+
 /** Trimestres do mais recente para o mais antigo, a partir de hoje. */
 export function trimestresCandidatos(agora: Date, quantos = 6): string[] {
   let y = agora.getUTCFullYear(), q = Math.floor(agora.getUTCMonth() / 3) + 1;
@@ -164,7 +176,17 @@ export function trimestresCandidatos(agora: Date, quantos = 6): string[] {
 }
 
 async function existe(ctx: Ctx, url: string): Promise<boolean> {
-  try { const r = await ctx.fetchImpl(url, { method: 'HEAD', signal: AbortSignal.timeout(20_000) }); return r.ok; } catch { return false; }
+  try {
+    const r = await ctx.fetchImpl(url, { method: 'HEAD', signal: AbortSignal.timeout(20_000) });
+    if (r.ok) return true;
+    if (r.status === 404) return false;
+  } catch { /* alguns servidores não aceitam HEAD */ }
+  // Plano B: pede só o primeiro byte.
+  try {
+    const r = await ctx.fetchImpl(url, { headers: { range: 'bytes=0-0' }, signal: AbortSignal.timeout(20_000) });
+    await r.body?.cancel().catch(() => undefined);
+    return r.ok || r.status === 206;
+  } catch { return false; }
 }
 
 /** Descobre o trimestre mais recente publicado e a URL de cada arquivo. */
@@ -200,19 +222,24 @@ export async function importarPgfn(ctx: Ctx, opts: { forcar?: boolean } = {}): P
   if (!pub) return { trimestre: null, origens: [], novas: 0, motivo: 'Não encontrei arquivos publicados pela PGFN.' };
 
   const res: ResultadoImportacao = { trimestre: pub.trimestre, origens: [], novas: 0 };
-  await mkdir(ctx.cfg.pgfnTmpDir, { recursive: true });
   for (const { origem, url } of pub.urls) {
     const { rows } = await ctx.db.query('select cnpj from pgfn_verificados where trimestre = $1 and origem = $2', [pub.trimestre, origem]);
     const feitos = new Set(rows.map((r) => r.cnpj as string));
     const faltam = [...procurados].filter((c) => !feitos.has(c));
     if (!opts.forcar && !faltam.length) continue;
 
-    const tmp = join(ctx.cfg.pgfnTmpDir, `${pub.trimestre}-${newId()}.zip`);
-    try {
-      const r = await ctx.fetchImpl(url, { signal: AbortSignal.timeout(60 * 60 * 1000) });
+    {
+      const r = await ctx.fetchImpl(url, { signal: AbortSignal.timeout(2 * 60 * 60 * 1000) });
       if (!r.ok || !r.body) throw new Error(`Download falhou (HTTP ${r.status}): ${url}`);
-      await pipeline(Readable.fromWeb(r.body as never), createWriteStream(tmp));
-      const { linhas, achados } = await filtrarZip(tmp, procurados);
+      let lido: { linhas: number; achados: Inscricao[] };
+      try {
+        lido = await filtrarZipStream(Readable.fromWeb(r.body as never), procurados);
+      } catch (e) {
+        // Alguns zips só podem ser lidos com acesso aleatório: baixa para o disco e lê de novo.
+        console.warn(`PGFN: leitura em fluxo falhou (${(e as Error).message}); tentando pelo disco.`);
+        lido = await viaDisco(ctx, url, procurados);
+      }
+      const { linhas, achados } = lido;
 
       // Inscrições que ainda não existiam viram aviso.
       const antes = await ctx.db.query('select cnpj, numero_inscricao from divida_ativa where origem = $1', [origem]);
@@ -237,11 +264,59 @@ export async function importarPgfn(ctx: Ctx, opts: { forcar?: boolean } = {}): P
       await avisarNovas(ctx, novas, origem);
       res.novas += novas.length;
       res.origens.push({ origem, linhas, encontrados: achados.length });
-    } finally {
-      await rm(tmp, { force: true });
     }
   }
   return res;
+}
+
+async function viaDisco(ctx: Ctx, url: string, procurados: Set<string>) {
+  const { createWriteStream } = await import('node:fs');
+  const { mkdir, rm } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const { pipeline } = await import('node:stream/promises');
+  await mkdir(ctx.cfg.pgfnTmpDir, { recursive: true });
+  const tmp = join(ctx.cfg.pgfnTmpDir, `${newId()}.zip`);
+  try {
+    const r = await ctx.fetchImpl(url, { signal: AbortSignal.timeout(2 * 60 * 60 * 1000) });
+    if (!r.ok || !r.body) throw new Error(`Download falhou (HTTP ${r.status}): ${url}`);
+    await pipeline(Readable.fromWeb(r.body as never), createWriteStream(tmp));
+    return await filtrarZip(tmp, procurados);
+  } finally { await rm(tmp, { force: true }); }
+}
+
+/* ---------- execução em segundo plano ---------- */
+export const estadoPgfn: { rodando: boolean; iniciadoEm: string | null; ultimoErro: string | null; concluidoEm: string | null; deNovo: boolean } =
+  { rodando: false, iniciadoEm: null, ultimoErro: null, concluidoEm: null, deNovo: false };
+let agendado: NodeJS.Timeout | null = null;
+
+/** Agenda uma conferência (ex.: logo depois de cadastrar um CNPJ). Só baixa se houver CNPJ ainda não conferido. */
+export function agendarPgfn(ctx: Ctx, atrasoMs = 15_000) {
+  if (ctx.cfg.env === 'test' || process.env.PGFN_DESLIGADO === '1') return;
+  if (estadoPgfn.rodando) { estadoPgfn.deNovo = true; return; }
+  if (agendado) return;
+  agendado = setTimeout(() => { agendado = null; void rodarPgfn(ctx); }, atrasoMs);
+  agendado.unref?.();
+}
+
+export async function rodarPgfn(ctx: Ctx) {
+  if (estadoPgfn.rodando) { estadoPgfn.deNovo = true; return; }
+  estadoPgfn.rodando = true; estadoPgfn.iniciadoEm = new Date().toISOString();
+  // No plano grátis o servidor dorme sem visitas: enquanto confere, ele mesmo se visita para não ser desligado no meio.
+  const url = process.env.RENDER_EXTERNAL_URL;
+  const acordado = url ? setInterval(() => { fetch(`${url}/api/health`).catch(() => undefined); }, 4 * 60 * 1000) : null;
+  try {
+    const r = await importarPgfn(ctx);
+    estadoPgfn.ultimoErro = null; estadoPgfn.concluidoEm = new Date().toISOString();
+    console.log(JSON.stringify({ pgfn: r }));
+  } catch (e) {
+    estadoPgfn.ultimoErro = (e as Error).message;
+    console.error('PGFN: falhou', (e as Error).message);
+    setTimeout(() => agendarPgfn(ctx, 0), 30 * 60 * 1000).unref?.();
+  } finally {
+    if (acordado) clearInterval(acordado);
+    estadoPgfn.rodando = false;
+    if (estadoPgfn.deNovo) { estadoPgfn.deNovo = false; agendarPgfn(ctx, 1000); }
+  }
 }
 
 async function avisarNovas(ctx: Ctx, novas: Inscricao[], origem: string) {

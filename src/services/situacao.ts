@@ -1,7 +1,7 @@
 import { avaliarCadastro, lookupCnpj, regimePelaReceita, type Cadastral } from '../cnpj.js';
 import type { Ctx } from '../ctx.js';
 import type { Row } from '../db.js';
-import { dividaDoCnpj } from '../pgfn/importador.js';
+import { dividaDoCnpj, estadoPgfn } from '../pgfn/importador.js';
 import { newId, todayISO, diffDays } from '../util.js';
 import { resumoEmpresa } from './dominio.js';
 import { competenciasMei, ehMei } from './dasmei.js';
@@ -56,7 +56,11 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
   const divida = e.cnpj ? await dividaDoCnpj(ctx, e.cnpj) : null;
   const nivelDivida: Nivel = !divida || !divida.verificado ? 'pendente' : divida.inscricoes.length ? 'alerta' : 'ok';
   const textoDivida = !divida || !divida.verificado
-    ? 'Conferência agendada: a base da PGFN é baixada e cruzada durante a noite.'
+    ? estadoPgfn.rodando
+      ? 'Conferindo agora na base oficial da PGFN. Leva alguns minutos: esta tela se atualiza sozinha.'
+      : estadoPgfn.ultimoErro
+        ? 'Não consegui baixar a base da PGFN agora. O sistema tenta de novo sozinho em 30 minutos.'
+        : 'Na fila para conferir na base oficial da PGFN. Começa em instantes.'
     : divida.inscricoes.length
       ? `${divida.inscricoes.length} ${divida.inscricoes.length === 1 ? 'inscrição' : 'inscrições'} em dívida ativa, total de R$ ${divida.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
       : `Nenhuma inscrição em dívida ativa da União ou do FGTS (base do ${divida.trimestre}).`;
@@ -76,7 +80,7 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
   const meiDevendo = meiVencidas.filter((m) => m.status === 'nao_pago');
   const meiSemResposta = meiVencidas.filter((m) => m.status === 'nao_confirmado');
   const blocoMei = mei ? [{
-    id: 'dasmei', titulo: 'DAS-MEI (guia mensal do MEI)',
+    id: 'dasmei', grupo: 'serpro', titulo: 'DAS-MEI (guia mensal do MEI)',
     nivel: (meiDevendo.length ? 'alerta' : meiSemResposta.length ? 'pendente' : 'ok') as Nivel,
     texto: meiDevendo.length
       ? `${meiDevendo.length} ${meiDevendo.length === 1 ? 'mês não pago' : 'meses não pagos'}: ${meiDevendo.map((m) => m.competencia.split('-').reverse().join('/')).join(', ')}.`
@@ -86,16 +90,16 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
     fonte: 'Calendário oficial do DAS-MEI (vence dia 20); pagamento confirmado por você', atualizadoEm: null, automatico: false,
   }] : [];
   const blocos = [
-    { id: 'cadastro', titulo: 'Cadastro na Receita Federal', nivel: av.nivel as Nivel, texto: av.texto, fonte: cad?.fonte ?? 'Dados abertos da Receita Federal', atualizadoEm: cad?.consultadoEm ?? null, automatico: true },
-    { id: 'divida', titulo: 'Dívida ativa da União e do FGTS', nivel: nivelDivida, texto: textoDivida, fonte: divida?.fonte ?? 'PGFN - dados abertos', atualizadoEm: divida?.trimestre ?? null, automatico: true },
+    { id: 'cadastro', grupo: 'auto', titulo: 'Cadastro na Receita Federal', nivel: av.nivel as Nivel, texto: av.texto, fonte: cad?.fonte ?? 'Dados abertos da Receita Federal', atualizadoEm: cad?.consultadoEm ?? null, automatico: true },
+    { id: 'divida', grupo: 'auto', titulo: 'Dívida ativa da União e do FGTS', nivel: nivelDivida, texto: textoDivida, fonte: divida?.fonte ?? 'PGFN - dados abertos', atualizadoEm: divida?.trimestre ?? null, automatico: true },
     ...blocoMei,
-    { id: 'receita', titulo: 'Tributos federais, guias e pagamentos (e-CAC)', nivel: nivelReceita,
+    { id: 'receita', grupo: 'serpro', titulo: 'Tributos federais, guias e pagamentos (e-CAC)', nivel: nivelReceita,
       texto: e.receita_conectada ? 'Conectado à Receita pelo Integra Contador.' : 'Precisa da sua autorização (procuração eletrônica no e-CAC).',
       fonte: 'Receita Federal, pelo Integra Contador (Serpro)', atualizadoEm: e.receita_ultima ? new Date(e.receita_ultima).toISOString() : null, automatico: receitaPronta },
-    { id: 'guias', titulo: 'Guias cadastradas por você', nivel: nivelGuias,
+    { id: 'guias', grupo: 'voce', titulo: 'Guias cadastradas por você', nivel: nivelGuias,
       texto: guias.atrasadas ? `${guias.atrasadas} ${guias.atrasadas === 1 ? 'guia atrasada' : 'guias atrasadas'}.` : guias.emAberto ? `${guias.emAberto} em aberto, nenhuma atrasada.` : 'Nenhuma guia cadastrada. Sem a conexão com a Receita, o sistema só conhece as guias que você cadastra ou anexa.',
       fonte: 'Cadastradas por você ou lidas dos seus documentos', atualizadoEm: null, automatico: false },
-    { id: 'certidoes', titulo: 'Estado e município (certidões)', nivel: nivelCert,
+    { id: 'certidoes', grupo: 'voce', titulo: 'Estado e município (certidões)', nivel: nivelCert,
       texto: !certidoes.length ? 'Não há consulta automática nacional para ICMS e ISS. Anexe as certidões em Documentos.' : certidoes.some((c) => !c.vencida) ? 'Há certidão válida anexada.' : 'Todas as certidões anexadas estão vencidas.',
       fonte: 'Certidões anexadas por você', atualizadoEm: null, automatico: false },
   ];
@@ -109,7 +113,7 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
 
   return {
     empresa: { id: e.id, nome: e.nome, cnpj: e.cnpj },
-    resumo, blocos, cadastro: cad, divida, guias, certidoes, mei,
+    resumo, blocos, cadastro: cad, divida, guias, certidoes, mei, pgfnRodando: estadoPgfn.rodando || (!!divida && !divida.verificado && !estadoPgfn.ultimoErro),
     procuracao: { conectada: !!e.receita_conectada, procuradorCnpj: ctx.cfg.procuradorCnpj || null, servicoConfigurado: receitaPronta },
     naoCobre: ['ICMS (cada estado tem o seu sistema)', 'ISS e taxas municipais (cada prefeitura tem o seu)', 'Débitos ainda não inscritos em dívida ativa, sem a procuração no e-CAC'],
   };

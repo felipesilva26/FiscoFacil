@@ -9,7 +9,7 @@ import { SerproReceitaProvider } from './receita/serpro.js';
 import { ConsoleNotifier, SmtpNotifier } from './services/notifier.js';
 import { runReminders } from './services/reminders.js';
 import { atualizarCadastrosAntigos } from './services/situacao.js';
-import { importarPgfn } from './pgfn/importador.js';
+import { agendarPgfn, rodarPgfn } from './pgfn/importador.js';
 
 const cfg = loadConfig();
 const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir, schema: cfg.databaseSchema });
@@ -21,16 +21,12 @@ const ctx: Ctx = {
 const app = await buildApp(ctx);
 
 // Lembretes: confere a cada hora; cada aviso só sai uma vez (tabela lembretes_enviados).
-let pgfnRodando = false;
 const timer = setInterval(() => {
   runReminders(ctx).catch((e) => app.log.error(e));
   atualizarCadastrosAntigos(ctx).catch((e) => app.log.error(e));
   // Dívida ativa (PGFN): de madrugada, só quando há trimestre novo ou CNPJ ainda não conferido.
   const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
-  if (hora === 3 && !pgfnRodando && process.env.PGFN_DESLIGADO !== '1') {
-    pgfnRodando = true;
-    importarPgfn(ctx).then((r) => app.log.info({ pgfn: r }, 'importação PGFN')).catch((e) => app.log.error(e)).finally(() => { pgfnRodando = false; });
-  }
+  if (hora === 3 && process.env.PGFN_DESLIGADO !== '1') void rodarPgfn(ctx);
 }, 60 * 60 * 1000);
 timer.unref();
 
@@ -39,6 +35,8 @@ process.on('SIGINT', parar);
 process.on('SIGTERM', parar);
 
 await app.listen({ port: cfg.port, host: '0.0.0.0' });
+// Confere na PGFN os CNPJs que ainda não foram conferidos (não baixa nada se já estiver tudo em dia).
+agendarPgfn(ctx, 20_000);
 
 // Diagnóstico ao iniciar: confere se cada fonte da consulta cadastral responde daqui do servidor.
 for (const modelo of cfg.cnpjLookupUrl.split(',').map((m) => m.trim()).filter(Boolean)) {

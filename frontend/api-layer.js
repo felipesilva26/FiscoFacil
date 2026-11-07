@@ -439,10 +439,15 @@ function pgSituacao(){
   const acao = b => (L[b.id] || []).map(l => l.interno
       ? (l.acao ? '<button class="btn soft sm" data-action="' + l.acao + '">' + esc(l.txt) + '</button>' : '<a class="btn soft sm" href="' + l.url + '">' + esc(l.txt) + '</a>')
       : '<a class="btn soft sm" href="' + l.url + '" target="_blank" rel="noopener">' + esc(l.txt) + ic('right', 14) + '</a>').join('');
-  const blocos = s.blocos.map(b => { const n = NIVEL[b.nivel] || NIVEL.info;
+  const linhaB = b => { const n = NIVEL[b.nivel] || NIVEL.info;
     return '<li class="sitrow"><span class="chip ' + n[0] + '"><i></i>' + n[1] + '</span><div class="grow"><b>' + esc(b.titulo) + '</b><p>' + esc(b.texto) + '</p><small>Fonte: ' + esc(b.fonte) +
-      (b.atualizadoEm ? ' · ' + (/^\d{4}-/.test(b.atualizadoEm) ? 'consultado em ' + fmtDT(b.atualizadoEm) : 'base do ' + esc(b.atualizadoEm)) : '') + '</small>' + (acao(b) ? '<div class="sitlinks">' + acao(b) + '</div>' : '') + '</div></li>'; }).join('');
-  const lista = sec('sb', 'O que foi conferido', '<ul class="sitlist">' + blocos + '</ul>');
+      (b.atualizadoEm ? ' · ' + (/^\d{4}-/.test(b.atualizadoEm) ? 'consultado em ' + fmtDT(b.atualizadoEm) : 'base do ' + esc(b.atualizadoEm)) : '') + '</small>' + (acao(b) ? '<div class="sitlinks">' + acao(b) + '</div>' : '') + '</div></li>'; };
+  const GRUPOS = [['auto', 'Conferido automaticamente nas fontes oficiais', ''],
+    ['serpro', 'Precisa da conexão com a Receita', 'Guias, pagamentos e pendências federais só podem ser lidos com o contrato do Integra Contador (Serpro) e a sua autorização. Até lá, você confirma aqui.'],
+    ['voce', 'Informado por você', '']];
+  const lista = GRUPOS.map(g => { const bs = s.blocos.filter(b => (b.grupo || 'auto') === g[0]); if (!bs.length) return '';
+    return sec('sb-' + g[0], g[1], (g[2] ? '<p class="sub" style="margin:0 0 6px">' + g[2] + '</p>' : '') + '<ul class="sitlist">' + bs.map(linhaB).join('') + '</ul>'); }).join('');
+  if (s.pgfnRodando && ui.page === 'situacao') { clearTimeout(pgSituacao.t); pgSituacao.t = setTimeout(() => { if (ui.page === 'situacao' && S.empresaId === e.id) { delete SIT[e.id]; carregarSituacao(e.id); } }, 30000); }
 
   let dados = '';
   if (c) {
@@ -493,5 +498,5 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação fiscal', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + meiSec + lista + divida + passos + '</div><div class="stack">' + dados + atalhos + linha + '</div></div>' + limites;
+    veredito + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + meiSec + passos + '</div><div class="stack">' + dados + atalhos + linha + '</div></div>' + limites;
 }

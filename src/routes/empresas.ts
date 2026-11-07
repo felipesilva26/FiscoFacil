@@ -8,6 +8,7 @@ import { auditar, empresaDoUsuario, REGIMES, resumoEmpresa, toEmpresa, toObrigac
 import { newId, todayISO } from '../util.js';
 import { makeGuard } from './guard.js';
 import { atualizarCadastro } from '../services/situacao.js';
+import { agendarPgfn } from '../pgfn/importador.js';
 
 const cnpjSchema = z.string().refine(validCnpj, 'CNPJ inválido. Confira os 14 números.').transform(formatCnpj);
 const novaEmpresa = z.object({
@@ -51,6 +52,7 @@ export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {
     // Busca o cadastro público em segundo plano; a tela mostra quando chegar.
     const criada = await empresaDoUsuario(ctx, req.userId, id);
     if (criada) void atualizarCadastro(ctx, criada).catch(() => undefined);
+    agendarPgfn(ctx);
     return reply.code(201).send(toEmpresa((await empresaDoUsuario(ctx, req.userId, id))!));
   });
 
