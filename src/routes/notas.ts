@@ -23,7 +23,7 @@ const nova = z.object({
   contraparteDoc: z.string().nullable().optional(),
   contraparteNome: z.string().trim().max(200).nullable().optional(),
   valor: z.number().positive('O valor precisa ser maior que zero.').max(1e10),
-  impostos: z.record(z.number().nonnegative()).default({}),
+  impostos: z.record(z.string(), z.number().nonnegative()).default({}),
 });
 
 const toNota = (r: Row) => ({

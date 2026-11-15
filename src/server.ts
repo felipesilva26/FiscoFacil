@@ -14,7 +14,18 @@ import { agendarPgfn, rodarPgfn } from './pgfn/importador.js';
 import { limparDadosAntigos } from './routes/conta.js';
 
 const cfg = loadConfig();
-const db = await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir, schema: cfg.databaseSchema });
+// Banco fora do ar na partida: tenta de novo algumas vezes antes de desistir, com mensagem clara (sem senha no log).
+async function abrirBanco() {
+  for (let t = 1; ; t++) {
+    try { return await createDb({ databaseUrl: cfg.databaseUrl, dataDir: cfg.dataDir, schema: cfg.databaseSchema }); }
+    catch (e) {
+      console.error(`Banco de dados indisponível (tentativa ${t}/5): ${(e as Error).message}`);
+      if (t >= 5) throw new Error('Não foi possível conectar ao banco de dados. Confira DATABASE_URL e se o banco está ativo.');
+      await new Promise((r) => setTimeout(r, 3000 * t));
+    }
+  }
+}
+const db = await abrirBanco();
 const ctx: Ctx = {
   cfg, db, now: () => new Date(), fetchImpl: fetch,
   notifier: cfg.smtpUrl ? new SmtpNotifier(cfg.smtpUrl, cfg.mailFrom) : new ConsoleNotifier(),

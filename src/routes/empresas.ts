@@ -25,7 +25,7 @@ const edicao = z.object({
 const conexao = z.object({
   cnpj: cnpjSchema.optional(),
   autorizacao: z.enum(['procuracao_ecac', 'procurador_contador', 'certificado_ecnpj']),
-  confirmo: z.literal(true, { errorMap: () => ({ message: 'Confirme que você é responsável pelo CNPJ ou tem autorização.' }) }),
+  confirmo: z.literal(true, { message: 'Confirme que você é responsável pelo CNPJ ou tem autorização.' }),
 });
 
 export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {

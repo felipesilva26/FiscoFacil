@@ -10,7 +10,7 @@ const registro = z.object({
   nome: z.string().trim().min(2, 'Informe seu nome.').max(120),
   email: z.string().trim().toLowerCase().email('E-mail inválido.').max(200),
   senha: z.string().min(8, 'A senha precisa ter pelo menos 8 caracteres.').max(200),
-  aceite: z.literal(true, { errorMap: () => ({ message: 'É preciso aceitar a política de privacidade.' }) }),
+  aceite: z.literal(true, { message: 'É preciso aceitar a política de privacidade.' }),
 });
 const proteger = registro.omit({ aceite: true });
 /** Contas de teste ("sem cadastro") usam este domínio fictício; nunca recebem e-mail. */
@@ -35,7 +35,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
 
   /** Uso sem cadastro: conta ligada só a este navegador. Pode virar conta com e-mail depois (/api/auth/proteger). */
   app.post('/api/auth/anonimo', limite, async (req, reply) => {
-    z.object({ aceite: z.literal(true, { errorMap: () => ({ message: 'É preciso aceitar a política de privacidade.' }) }) }).parse(req.body ?? {});
+    z.object({ aceite: z.literal(true, { message: 'É preciso aceitar a política de privacidade.' }) }).parse(req.body ?? {});
     const id = newId();
     await ctx.db.query('insert into users (id, email, nome, senha_hash, anonimo, aceite_privacidade) values ($1, $2, $3, $4, true, now())',
       [id, `${id}${DOMINIO_ANONIMO}`, 'Visitante', await hashPassword(randomBytes(24).toString('hex'))]);

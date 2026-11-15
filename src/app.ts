@@ -22,7 +22,7 @@ import { ReceitaNaoConfigurada } from './receita/provider.js';
 const escHtml = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export async function buildApp(ctx: Ctx): Promise<FastifyInstance> {
-  const app = Fastify({ logger: ctx.cfg.env === 'test' ? false : { level: 'info', redact: ['req.headers.authorization'] }, bodyLimit: 1_000_000, trustProxy: true });
+  const app = Fastify({ logger: ctx.cfg.env === 'test' ? false : { level: 'info', redact: ['req.headers.authorization'] }, bodyLimit: 1_000_000, trustProxy: (ctx.cfg.trustProxy > 0 ? ctx.cfg.trustProxy : false) as unknown as boolean });
 
   await app.register(cors, { origin: ctx.cfg.corsOrigin.length ? ctx.cfg.corsOrigin : false, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] });
   // Limite por IP só na API (página e fontes não contam); escritórios atrás de um mesmo IP têm folga.
@@ -63,7 +63,10 @@ export async function buildApp(ctx: Ctx): Promise<FastifyInstance> {
 
   app.setNotFoundHandler((req, reply) => (req.url.startsWith('/api/') ? reply.code(404).send({ erro: 'Rota não encontrada.' }) : reply.code(404).send('Não encontrado')));
 
-  app.get('/api/health', async () => ({ ok: true, receita: ctx.receita.nome, semLogin: ctx.cfg.semLogin }));
+  app.get('/api/health', async (_req, reply) => {
+    const db = await ctx.db.query('select 1').then(() => true, () => false);
+    return reply.code(db ? 200 : 503).send({ ok: db, db, receita: ctx.receita.nome, semLogin: ctx.cfg.semLogin });
+  });
 
   await authRoutes(app, ctx);
   await empresasRoutes(app, ctx);

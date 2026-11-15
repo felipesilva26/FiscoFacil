@@ -6,7 +6,7 @@ import { isISODate, newId, todayISO, toCents } from '../util.js';
 import { makeGuard } from './guard.js';
 
 const data = z.string().refine(isISODate, 'Data inválida. Use AAAA-MM-DD.');
-const valor = z.number({ invalid_type_error: 'Informe o valor em reais (número).' })
+const valor = z.number({ error: 'Informe o valor em reais (número).' })
   .positive('O valor precisa ser maior que zero.').max(21_000_000, 'Valor acima do limite.');
 
 const nova = z.object({

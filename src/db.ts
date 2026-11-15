@@ -23,12 +23,21 @@ export async function createDb(opts: { databaseUrl?: string; dataDir?: string; s
     // DATABASE_SCHEMA permite dividir um banco com outro sistema sem misturar as tabelas.
     const schema = opts.schema && /^[a-z_][a-z0-9_]*$/.test(opts.schema) ? opts.schema : undefined;
     if (schema) {
-      const c = new pg.Client({ connectionString: opts.databaseUrl });
+      const c = new pg.Client({ connectionString: opts.databaseUrl, connectionTimeoutMillis: 10_000 });
       await c.connect();
       await c.query(`create schema if not exists ${schema}`);
       await c.end();
     }
-    const pool = new pg.Pool({ connectionString: opts.databaseUrl, ...(schema ? { options: `-c search_path=${schema}` } : {}) });
+    const pool = new pg.Pool({
+      connectionString: opts.databaseUrl,
+      max: 10,
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 30_000,
+      statement_timeout: 30_000,
+      ...(schema ? { options: `-c search_path=${schema}` } : {}),
+    });
+    // Sem isto, uma conexão ociosa derrubada pelo servidor viraria erro não tratado e encerraria o processo.
+    pool.on('error', (e) => console.error('pg pool:', e.message));
     db = {
       query: async (sql, params) => ({ rows: (await pool.query(sql, params as any[])).rows as any }),
       exec: async (sql) => { await pool.query(sql); },

@@ -31,7 +31,7 @@ export async function contaRoutes(app: FastifyInstance, ctx: Ctx) {
 
   /** Apaga a conta e tudo ligado a ela. Não tem volta. */
   app.delete('/api/conta', { preHandler: guard, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
-    z.object({ confirmar: z.literal('EXCLUIR', { errorMap: () => ({ message: 'Digite EXCLUIR para confirmar.' }) }) }).parse(req.body);
+    z.object({ confirmar: z.literal('EXCLUIR', { message: 'Digite EXCLUIR para confirmar.' }) }).parse(req.body);
     await excluirUsuario(ctx, req.userId);
     return reply.code(204).send();
   });

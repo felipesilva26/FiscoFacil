@@ -38,6 +38,8 @@ export interface Config {
   procuradorCnpj: string;
   /** Só para testes: sobe o limite de tentativas de login/cadastro por minuto. */
   limiteAuth?: number;
+  /** Quantos proxies confiáveis existem na frente do app (0 = nenhum). Define de onde sai o IP do cliente. */
+  trustProxy: number;
 }
 
 type Env = Record<string, string | undefined>;
@@ -56,6 +58,7 @@ export function loadConfig(env: Env = process.env): Config {
   return {
     env: env.NODE_ENV ?? 'development',
     port: Number(env.PORT ?? 3000),
+    trustProxy: Number.isInteger(Number(env.TRUST_PROXY)) && env.TRUST_PROXY?.trim() ? Number(env.TRUST_PROXY) : prod ? 1 : 0,
     databaseUrl: e('DATABASE_URL') || undefined,
     databaseSchema: e('DATABASE_SCHEMA') || undefined,
     semLogin: e('SEM_LOGIN') === '1',
