@@ -41,6 +41,16 @@ export async function situacaoRoutes(app: FastifyInstance, ctx: Ctx) {
     return situacaoFiscal(ctx, (await empresaDoUsuario(ctx, req.userId, e.id))!);
   });
 
+  /** O dono corrige a atividade usada no valor do DAS-MEI (comércio, serviços ou os dois). */
+  app.post('/api/empresas/:id/das-mei/atividade', { preHandler: guard }, async (req, reply) => {
+    const e = await empresaDoUsuario(ctx, req.userId, (req.params as { id: string }).id);
+    if (!e) return reply.code(404).send(naoAchou);
+    if (!ehMei(e)) return reply.code(409).send({ erro: 'Esta empresa não está como MEI.' });
+    const b = z.object({ atividade: z.enum(['comercio', 'servicos', 'ambos']) }).parse(req.body);
+    await ctx.db.query('update empresas set das_atividade = $1 where id = $2', [b.atividade, e.id]);
+    return situacaoFiscal(ctx, (await empresaDoUsuario(ctx, req.userId, e.id))!);
+  });
+
   app.get('/api/alertas', { preHandler: guard }, async (req) => {
     const { rows } = await ctx.db.query('select id, empresa_id, nivel, texto, fonte, lido, criado_em from alertas where user_id = $1 order by criado_em desc limit 50', [req.userId]);
     return rows.map((r) => ({ id: r.id, empresaId: r.empresa_id, nivel: r.nivel, texto: r.texto, fonte: r.fonte, lido: r.lido, criadoEm: new Date(r.criado_em).toISOString() }));

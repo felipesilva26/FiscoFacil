@@ -4,7 +4,7 @@ import type { Row } from '../db.js';
 import { dividaDoCnpj, estadoPgfn } from '../pgfn/importador.js';
 import { todayISO, diffDays } from '../util.js';
 import { resumoEmpresa } from './dominio.js';
-import { competenciasMei, ehMei } from './dasmei.js';
+import { atividadeEfetiva, competenciasMei, composicaoDas, ehMei } from './dasmei.js';
 import { compararCadastro, historicoMudancas, registrarMudancas, resumoMonitor } from './monitor.js';
 
 type Nivel = 'ok' | 'alerta' | 'pendente' | 'info';
@@ -91,6 +91,7 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
   return {
     empresa: { id: e.id, nome: e.nome, cnpj: e.cnpj },
     resumo, blocos, cadastro: cad, divida, guias, certidoes, mei,
+    meiInfo: mei ? { ...atividadeEfetiva(e), valorAtual: composicaoDas(Number(hoje.slice(0, 4)), atividadeEfetiva(e).atividade) } : null,
     monitor: { ...(await resumoMonitor(ctx)), mudancas: await historicoMudancas(ctx, e.id) }, pgfnRodando: estadoPgfn.rodando || (!!divida && !divida.verificado && !estadoPgfn.ultimoErro),
     procuracao: { conectada: !!e.receita_conectada, procuradorCnpj: ctx.cfg.procuradorCnpj || null, servicoConfigurado: receitaPronta },
     naoCobre: ['ICMS (cada estado tem o seu sistema)', 'ISS e taxas municipais (cada prefeitura tem o seu)', 'Débitos ainda não inscritos em dívida ativa, sem a procuração no e-CAC'],

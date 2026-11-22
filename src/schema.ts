@@ -150,6 +150,9 @@ create index if not exists notas_empresa_data on notas_fiscais (empresa_id, data
 create index if not exists auditoria_criado on auditoria (criado_em);
 create unique index if not exists notas_chave_unica on notas_fiscais (empresa_id, chave) where chave is not null;
 
+-- Atividade do MEI para o valor do DAS (null = deduzir pelo cadastro): comercio | servicos | ambos.
+alter table empresas add column if not exists das_atividade text;
+
 -- Monitoramento diário: histórico do que mudou no cadastro público de cada empresa.
 create table if not exists mudancas_cadastro (
   id text primary key,

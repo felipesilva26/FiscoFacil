@@ -428,6 +428,7 @@ async function carregarSituacao(id, forcar){
   if (ui.page === 'situacao' || ui.page === 'inicio') renderMain();
 }
 ACT['sit-atualizar'] = rodar(async () => { delete SIT[S.empresaId]; renderMain(); await carregarSituacao(S.empresaId, true); toast(sitErro ? sitErro : 'Situação atualizada nas fontes oficiais.'); });
+ACT['mei-atv'] = rodar(async el => { const id = S.empresaId; const r = await api('POST', '/api/empresas/' + id + '/das-mei/atividade', {atividade:el.dataset.a}); SIT[id] = r; renderMain(); toast('Valor do DAS atualizado.'); });
 ACT['sit-ir-autorizar'] = () => { const el = $('#autorizar'); if (el) el.closest('section').scrollIntoView({behavior:'smooth', block:'start'}); };
 const MESES_N = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 const nomeComp = c => { const p = c.split('-'); return MESES_N[Number(p[1]) - 1] + '/' + p[0]; };
@@ -514,21 +515,34 @@ function pgSituacao(){
     '<li class="hoje"><time>' + dataBR(iso(today())) + '</time><span>Hoje: ' + esc(v.titulo.toLowerCase()) + '</span></li></ol>') : '';
 
   const d = s.divida;
-  const divida = d && d.inscricoes.length ? sec('sd', 'Dívida ativa da União e do FGTS',
-    '<div class="tablewrap"><table class="tbl"><thead><tr><th>Inscrição</th><th>Origem</th><th>Receita</th><th class="money">Valor</th><th>Situação</th></tr></thead><tbody>' +
-    d.inscricoes.map(i => '<tr><td class="num">' + esc(i.numero) + '</td><td>' + esc(i.origem) + '</td><td>' + esc(i.receita || '') + '</td><td class="num money">' + reais(i.valor) + '</td><td>' + esc(i.situacao || '') + (i.ajuizado ? ' · ajuizada' : '') + '</td></tr>').join('') +
-    '</tbody></table></div><p class="hint" style="margin-top:12px">Total: <b>' + reais(d.total) + '</b>. Fonte: ' + esc(d.fonte) + ', base do ' + esc(d.trimestre) + '. Para pagar ou parcelar, use o Regularize da PGFN.</p>') : '';
-
-  const meiSec = s.mei && s.mei.length ? sec('sm', 'DAS-MEI mês a mês',
-    '<p class="sub" style="margin:0 0 12px">A guia do MEI vence todo dia 20. Sem a conexão com a Receita, o sistema não sabe se você pagou: marque cada mês.</p>' +
-    '<ul class="meilist">' + s.mei.map(m => {
-      const chipM = m.status === 'pago' ? '<span class="chip pago"><i></i>Pago</span>' : m.status === 'nao_pago' ? '<span class="chip atrasado"><i></i>' + (m.vencida ? 'Não pago, atrasado' : 'Não pago') + '</span>' : m.vencida ? '<span class="chip neutro"><i></i>Confirme</span>' : '<span class="chip avencer"><i></i>A vencer</span>';
+  const origNome = {'Não previdenciária':'não previdenciária', 'Previdenciária':'previdenciária', 'FGTS':'FGTS'};
+  const divida = d ? sec('sd', 'Dívida ativa da União e do FGTS', d.inscricoes.length
+    ? '<div class="tablewrap"><table class="tbl"><thead><tr><th>Inscrição</th><th>Origem</th><th>Receita</th><th class="money">Valor</th><th>Situação</th></tr></thead><tbody>' +
+      d.inscricoes.map(i => '<tr><td class="num">' + esc(i.numero) + '</td><td>' + esc(i.origem) + '</td><td>' + esc(i.receita || '') + '</td><td class="num money">' + reais(i.valor) + '</td><td>' + esc(i.situacao || '') + (i.ajuizado ? ' · ajuizada' : '') + '</td></tr>').join('') +
+      '</tbody></table></div><p class="hint" style="margin-top:12px">Total: <b>' + reais(d.total) + '</b>. Fonte: ' + esc(d.fonte) + ', base do ' + esc(d.trimestre) + '. Para pagar ou parcelar, use o Regularize da PGFN.</p>'
+    : d.verificado
+      ? '<div class="dvok"><span class="dvicon">' + ic('check', 22) + '</span><div><b>Nenhuma dívida ativa encontrada para este CNPJ.</b><p class="hint" style="margin:4px 0 0">Conferido na base oficial da PGFN do ' + esc(d.trimestre) + ' (' + (d.origensConferidas || []).map(o => origNome[o] || o).join(', ') + '). A PGFN publica uma base nova a cada trimestre e o sistema confere de novo sozinho quando ela sai.</p></div></div>'
+      : '<p class="hint">Conferindo na base oficial da PGFN. Leva alguns minutos e esta tela se atualiza sozinha.</p>') : '';
+  const ATV = {comercio:['Comércio ou indústria', 'ICMS'], servicos:['Serviços', 'ISS'], ambos:['Comércio e serviços', 'ICMS + ISS']};
+  const meiSec = s.mei && s.mei.length ? (function(){
+    const mi = s.meiInfo || {}, va = mi.valorAtual, atv = ATV[mi.atividade] || ATV.servicos;
+    const nPago = s.mei.filter(m => m.status === 'pago').length, nAberto = s.mei.filter(m => m.status === 'nao_pago').length, nConf = s.mei.filter(m => m.vencida && m.status === 'nao_confirmado').length;
+    const resumo = '<div class="meisum"><span class="chip pago"><i></i>' + nPago + ' pago' + (nPago === 1 ? '' : 's') + '</span><span class="chip atrasado"><i></i>' + nAberto + ' em aberto</span><span class="chip neutro"><i></i>' + nConf + ' a confirmar</span></div>';
+    const valorTxt = va ? 'INSS ' + reais(va.inss) + (va.icms ? ' + ICMS ' + reais(va.icms) : '') + (va.iss ? ' + ISS ' + reais(va.iss) : '') + ' = <b>' + reais(va.total) + '</b> por mês em ' + va.ano : 'Valor de ' + new Date().getFullYear() + ' ainda não cadastrado na tabela.';
+    const seg = Object.keys(ATV).map(k => '<button data-action="mei-atv" data-a="' + k + '" aria-pressed="' + (mi.atividade === k) + '">' + ATV[k][0] + '</button>').join('');
+    const cab = '<li class="cab" aria-hidden="true"><span>Mês</span><span>Valor</span><span>Situação</span><span></span></li>';
+    const linhas = s.mei.map(m => {
+      const chipM = m.status === 'pago' ? '<span class="chip pago"><i></i>Pago</span>' : m.status === 'nao_pago' ? '<span class="chip atrasado"><i></i>' + (m.vencida ? 'Em atraso' : 'Em aberto') + '</span>' : m.vencida ? '<span class="chip neutro"><i></i>A confirmar</span>' : '<span class="chip avencer"><i></i>A vencer</span>';
       const bt = (st, txt, cls) => '<button class="btn ' + cls + ' sm" data-action="das-mei" data-c="' + m.competencia + '" data-s="' + st + '">' + txt + '</button>';
-      return '<li class="meirow"><div class="grow"><b>' + esc(nomeComp(m.competencia)) + '</b><small>Vence ' + dataBR(m.vencimento) + (m.valor ? ' · ' + reais(m.valor) + ' (valor da tabela)' : '') + '</small></div>' + chipM +
-        '<div class="meibtns">' + (m.status !== 'pago' ? bt('pago', 'Paguei', 'soft') : '') + (m.status !== 'nao_pago' ? bt('nao_pago', 'Não paguei', 'ghost') : '') + '</div></li>';
-    }).join('') + '</ul>' +
-    '<div class="actions" style="justify-content:flex-start;margin-top:14px"><a class="btn primary" href="' + OFICIAL.pgmei.url + '" target="_blank" rel="noopener">Conferir e pagar no PGMEI (site da Receita)</a><button class="btn ghost" data-action="copiar-cnpj" data-cnpj="' + esc(fmtCnpj(e.cnpj || '')) + '">' + ic('copy', 16) + 'Copiar CNPJ</button></div>' +
-    '<p class="hint" style="margin-top:10px">No portal do Simples Nacional, entre em PGMEI. Use sempre o endereço receita.fazenda.gov.br: existem sites falsos de DAS. Se a guia vencer em feriado, pague no dia útil anterior.</p>') : '';
+      return '<li><span class="mmes"><b>' + esc(nomeComp(m.competencia)) + '</b><small>vence ' + dataBR(m.vencimento) + '</small></span><span class="mval">' + (m.valor ? reais(m.valor) : '-') + '</span>' + chipM +
+        '<span class="mbtn">' + (m.status !== 'pago' ? bt('pago', 'Paguei', 'primary') : '') + (m.status !== 'nao_pago' && m.status !== 'pago' ? bt('nao_pago', 'Não paguei', 'ghost') : '') + (m.status === 'pago' ? bt('nao_pago', 'Desfazer', 'ghost') : '') + '</span></li>';
+    }).join('');
+    return sec('sm', 'DAS-MEI: guia mensal do MEI', resumo +
+      '<ul class="meitbl">' + cab + linhas + '</ul>' +
+      '<div class="meiatv"><p class="sub" style="margin:0">Valor calculado como <b>' + esc(atv[0]) + '</b>: ' + valorTxt + '. O valor oficial é fixo e vem do salário mínimo. Se a sua guia tem outro valor, escolha a atividade certa:</p><div class="seg" role="group" aria-label="Atividade do MEI">' + seg + '</div></div>' +
+      '<div class="actions" style="justify-content:flex-start;margin-top:14px"><a class="btn primary" href="' + OFICIAL.pgmei.url + '" target="_blank" rel="noopener">Emitir e pagar no PGMEI (site da Receita)</a><button class="btn ghost" data-action="copiar-cnpj" data-cnpj="' + esc(fmtCnpj(e.cnpj || '')) + '">' + ic('copy', 16) + 'Copiar CNPJ</button></div>' +
+      '<p class="hint" style="margin-top:10px">Vence todo dia 20 (se cair no fim de semana, pague no dia útil anterior). Use sempre o endereço receita.fazenda.gov.br: existem sites falsos de DAS. Sem a conexão com a Receita, o sistema não sabe se você pagou: marque cada mês.</p>');
+  })() : '';
   const p = s.procuracao;
   const passos = sec('autorizar', 'Autorizar a consulta de tributos e guias', p.conectada
     ? '<p>Autorização registrada. As guias e pendências federais são consultadas no e-CAC automaticamente.</p>'
@@ -553,7 +567,7 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + confirmarMei(s) + numerosInicio(s) + '<div class="cols" style="margin-top:20px"><div class="stack">' + meiSec + lista + divida + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
+    veredito + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
 }
 
 

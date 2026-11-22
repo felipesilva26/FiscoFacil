@@ -13,11 +13,34 @@ const SALARIO_MINIMO: Record<number, number> = { 2024: 1412, 2025: 1518, 2026: 1
 
 export type Atividade = 'comercio' | 'servicos' | 'ambos';
 
-/** Pela atividade principal (CNAE): indústria (10-33) e comércio (45-47) pagam ICMS; o resto, ISS. */
-export function atividadeDe(c: Cadastral | null): Atividade {
-  const div = Number(String(c?.cnae ?? '').padStart(7, '0').slice(0, 2));
-  if (!div) return 'servicos';
+/** Indústria (10-33) e comércio (45-47) pagam ICMS; o resto, ISS. */
+const classeCnae = (cnae: string): 'comercio' | 'servicos' | null => {
+  const div = Number(String(cnae).padStart(7, '0').slice(0, 2));
+  if (!div) return null;
   return (div >= 10 && div <= 33) || (div >= 45 && div <= 47) ? 'comercio' : 'servicos';
+};
+
+/** Pela atividade principal e pelas secundárias (CNAE): só comércio/indústria, só serviços, ou os dois. */
+export function atividadeDe(c: Cadastral | null): Atividade {
+  const classes = new Set([c?.cnae, ...(c?.cnaesSecundarios ?? [])].filter(Boolean).map((x) => classeCnae(String(x))));
+  const com = classes.has('comercio'), srv = classes.has('servicos');
+  return com && srv ? 'ambos' : com ? 'comercio' : 'servicos';
+}
+
+/** A escolha do dono (se houver) vale mais do que a dedução pelo cadastro. */
+export function atividadeEfetiva(e: Row): { atividade: Atividade; escolhida: boolean } {
+  const x = e.das_atividade as string | null | undefined;
+  if (x === 'comercio' || x === 'servicos' || x === 'ambos') return { atividade: x, escolhida: true };
+  return { atividade: atividadeDe((e.cadastral ?? null) as Cadastral | null), escolhida: false };
+}
+
+/** De quanto é o DAS do mês e como o valor se compõe (INSS de 5% do salário mínimo + ICMS e/ou ISS). */
+export function composicaoDas(ano: number, atividade: Atividade) {
+  const sm = SALARIO_MINIMO[ano];
+  if (!sm) return null;
+  const inss = Math.round(sm * 5) / 100;
+  const icms = atividade === 'servicos' ? 0 : 1, iss = atividade === 'comercio' ? 0 : 5;
+  return { ano, inss, icms, iss, total: Math.round((inss + icms + iss) * 100) / 100 };
 }
 
 export function valorDasMei(ano: number, atividade: Atividade): number | null {
@@ -49,7 +72,7 @@ export async function competenciasMei(ctx: Ctx, e: Row, quantas = 6): Promise<Co
   const hoje = todayISO(ctx.now());
   const c = e.cadastral as Cadastral | null;
   const inicio = (c?.meiDesde ?? c?.abertura ?? '2000-01-01').slice(0, 7);
-  const atv = atividadeDe(c);
+  const atv = atividadeEfetiva(e).atividade;
   // A competência mais recente cuja guia vence nos próximos 40 dias.
   let comp = hoje.slice(0, 7);
   while (vencimentoDasMei(comp) > todayISO(new Date(ctx.now().getTime() + 40 * 864e5))) comp = competenciaAnterior(comp);
@@ -71,7 +94,7 @@ export async function marcarDasMei(ctx: Ctx, e: Row, competencia: string, status
     `insert into das_mei_status (empresa_id, competencia, status) values ($1, $2, $3)
      on conflict (empresa_id, competencia) do update set status = $3, marcado_em = now()`, [e.id, competencia, status]);
   const venc = vencimentoDasMei(competencia);
-  const valor = valorDasMei(Number(competencia.slice(0, 4)), atividadeDe(e.cadastral as Cadastral | null)) ?? 0;
+  const valor = valorDasMei(Number(competencia.slice(0, 4)), atividadeEfetiva(e).atividade) ?? 0;
   const { rows } = await ctx.db.query("select id, pago_em from obrigacoes where empresa_id = $1 and tributo = 'DAS' and venc = $2", [e.id, venc]);
   if (status === 'nao_pago') {
     if (!rows.length && valor > 0) {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { atividadeDe, valorDasMei, vencimentoDasMei } from '../src/services/dasmei.js';
+import { atividadeDe, atividadeEfetiva, composicaoDas, valorDasMei, vencimentoDasMei } from '../src/services/dasmei.js';
 import { CNPJ_TESTE, cadastrar, criar } from './helpers.js';
 
 describe('DAS-MEI: regras', () => {
@@ -17,6 +17,17 @@ describe('DAS-MEI: regras', () => {
     assert.equal(valorDasMei(1990, 'servicos'), null);
     assert.equal(atividadeDe({ cnae: '4751201' } as never), 'comercio');
     assert.equal(atividadeDe({ cnae: '6201501' } as never), 'servicos');
+  });
+  test('atividade considera os CNAEs secundários: comércio + serviço = os dois', () => {
+    assert.equal(atividadeDe({ cnae: '4772500', cnaesSecundarios: ['4789099'] } as never), 'comercio');
+    assert.equal(atividadeDe({ cnae: '4772500', cnaesSecundarios: ['9602501'] } as never), 'ambos');
+    assert.equal(atividadeDe({ cnae: '9602501', cnaesSecundarios: ['4772500'] } as never), 'ambos');
+  });
+  test('a escolha do dono vale mais do que o cadastro; composição do valor', () => {
+    assert.deepEqual(atividadeEfetiva({ cadastral: { cnae: '4772500' } } as never), { atividade: 'comercio', escolhida: false });
+    assert.deepEqual(atividadeEfetiva({ das_atividade: 'ambos', cadastral: { cnae: '4772500' } } as never), { atividade: 'ambos', escolhida: true });
+    assert.deepEqual(composicaoDas(2026, 'ambos'), { ano: 2026, inss: 81.05, icms: 1, iss: 5, total: 87.05 });
+    assert.equal(composicaoDas(2026, 'comercio')!.total, 82.05);
   });
 });
 
@@ -51,5 +62,24 @@ describe('DAS-MEI: o dono confirma se pagou', () => {
     const s = (await t.app.inject({ method: 'GET', url: `/api/empresas/${e.id}/situacao`, headers: h })).json();
     assert.equal(s.mei, null); assert.ok(!s.blocos.some((b: { id: string }) => b.id === 'dasmei'));
     assert.equal((await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/das-mei`, headers: h, payload: { competencia: '2026-09', status: 'pago' } })).statusCode, 409);
+  });
+});
+
+describe('DAS-MEI: corrigir a atividade pela tela', () => {
+  test('muda o valor das competências e só o dono da empresa consegue', async () => {
+    const t = await criar({ agora: '2026-11-02T15:00:00Z' });
+    const { h } = await cadastrar(t.app); const outro = await cadastrar(t.app);
+    const e = (await t.app.inject({ method: 'POST', url: '/api/empresas', headers: h, payload: { nome: 'Meu MEI', cnpj: CNPJ_TESTE, regime: 'MEI' } })).json();
+    const get = async () => (await t.app.inject({ method: 'GET', url: `/api/empresas/${e.id}/situacao`, headers: h })).json();
+    const antes = await get();
+    assert.equal(antes.meiInfo.escolhida, false);
+    const r = await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/das-mei/atividade`, headers: h, payload: { atividade: 'ambos' } });
+    assert.equal(r.statusCode, 200);
+    const depois = r.json();
+    assert.equal(depois.meiInfo.atividade, 'ambos'); assert.equal(depois.meiInfo.valorAtual.total, 87.05);
+    assert.ok(depois.mei.length > 0 && depois.mei.every((m: { valor: number }) => m.valor === 87.05));
+    assert.equal((await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/das-mei/atividade`, headers: outro.h, payload: { atividade: 'servicos' } })).statusCode, 404);
+    assert.equal((await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/das-mei/atividade`, headers: h, payload: { atividade: 'x' } })).statusCode, 400);
+    await t.fechar();
   });
 });

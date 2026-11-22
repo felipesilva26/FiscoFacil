@@ -45,6 +45,8 @@ export interface Cadastral {
   atividade?: string;
   cnae?: string;
   atividadesSecundarias: number;
+  /** Códigos (7 dígitos) dos CNAEs secundários; serve para saber se o MEI também presta serviços. */
+  cnaesSecundarios?: string[];
   endereco?: string;
   municipio?: string;
   uf?: string;
@@ -125,6 +127,7 @@ export function mapearCadastro(bruto: Record<string, unknown>, fonte: string, no
       atividade: s('cnae_fiscal_descricao'),
       cnae: j.cnae_fiscal != null ? String(j.cnae_fiscal) : undefined,
       atividadesSecundarias: Array.isArray(j.cnaes_secundarias) ? (j.cnaes_secundarias as unknown[]).filter((c) => (c as { codigo?: number })?.codigo).length : 0,
+      cnaesSecundarios: Array.isArray(j.cnaes_secundarias) ? (j.cnaes_secundarias as { codigo?: number }[]).map((c) => (c?.codigo ? String(c.codigo).padStart(7, '0') : '')).filter(Boolean) : undefined,
       endereco: end.trim() || undefined,
       municipio: s('municipio'),
       uf: s('uf'),
