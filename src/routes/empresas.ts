@@ -153,7 +153,10 @@ export async function empresasRoutes(app: FastifyInstance, ctx: Ctx) {
 
   // ---- Integração com a Receita ----
   const falhaReceita = (reply: import('fastify').FastifyReply, err: unknown) => {
-    if (err instanceof ReceitaNaoConfigurada) return reply.code(503).send({ erro: err.message, faltando: err.faltando });
+    if (err instanceof ReceitaNaoConfigurada) {
+      console.warn(`Receita: integração não configurada (faltam: ${err.faltando.join(', ')})`);
+      return reply.code(503).send({ erro: 'A conexão automática com a Receita ainda não está disponível no FiscoFácil. Enquanto isso, o sistema segue funcionando: confira o cadastro e a dívida ativa, marque os pagamentos e anexe os comprovantes.', faltando: err.faltando });
+    }
     return reply.code(502).send({ erro: 'A consulta à Receita falhou. Tente novamente mais tarde.' });
   };
 
