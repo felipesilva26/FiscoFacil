@@ -2,11 +2,18 @@ import { unlink } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Ctx } from '../ctx.js';
+import { gerarPlanilha } from '../services/planilha.js';
 import { makeGuard } from './guard.js';
 
 /** Direitos do titular (LGPD, art. 18): acesso/portabilidade e eliminação dos dados. */
 export async function contaRoutes(app: FastifyInstance, ctx: Ctx) {
   const guard = makeGuard(ctx.cfg);
+
+  app.get('/api/exportar/planilha', { preHandler: guard, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const q = z.object({ empresa: z.string().max(80).optional() }).safeParse(req.query);
+    const { buffer, nome } = await gerarPlanilha(ctx, req.userId!, q.success ? q.data.empresa : undefined);
+    return reply.header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('content-disposition', `attachment; filename="${nome}"`).header('cache-control', 'no-store').send(buffer);
+  });
 
   app.get('/api/conta/exportar', { preHandler: guard, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const q = async (sql: string, p: unknown[] = [req.userId]) => (await ctx.db.query(sql, p)).rows;

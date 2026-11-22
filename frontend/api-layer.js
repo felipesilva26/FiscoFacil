@@ -566,7 +566,7 @@ function pgSituacao(){
     '<ul class="atalhos">' + L.todos.map(l => '<li><a href="' + l.url + '" target="_blank" rel="noopener"><span><b>' + esc(l.txt) + '</b><small>' + esc(l.desc) + '</small></span>' + ic('right', 16) + '</a></li>').join('') + '</ul>' +
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
-  return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
+  return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="baixar-planilha">Baixar planilha</button> <button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
     veredito + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
 }
 
@@ -681,6 +681,14 @@ ACT['baixar-dados'] = rodar(async () => {
   const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
   a.href = url; a.download = 'fiscofacil-meus-dados.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
   toast('Arquivo com os seus dados baixado.');
+});
+ACT['baixar-planilha'] = rodar(async () => {
+  toast('Gerando a planilha…');
+  const r = await fetch('/api/exportar/planilha', {headers:{authorization:'Bearer ' + token}});
+  if (!r.ok) throw new Error('Não foi possível gerar a planilha.');
+  const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
+  a.href = url; a.download = 'FiscoFacil-planilha-' + new Date().toISOString().slice(0, 10) + '.xlsx'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Planilha baixada.');
 });
 ACT['excluir-conta'] = () => {
   $('#modal').innerHTML = '<div class="overlay" data-overlay><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mt" tabindex="-1"><div class="mhead"><h2 id="mt">Excluir conta e dados</h2><button class="ib" data-action="fechar" aria-label="Fechar">' + ic('x') + '</button></div>' +
