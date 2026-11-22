@@ -1802,6 +1802,12 @@ function pgSituacao(){
       '<li class="step"><span class="sn">4</span><div><b>Volte aqui e conecte</b><p class="hint">' + (p.servicoConfigurado ? 'O sistema confere a autorização e passa a consultar sozinho.' : 'A consulta automática à Receita ainda está sendo contratada pelo FiscoFácil. Sua autorização fica pronta para quando ela for ligada.') + '</p></div></li>' +
       '</ol><div class="actions" style="justify-content:flex-start;margin-top:14px"><button class="btn primary" data-action="conectar" data-emp="' + e.id + '">' + ic('plug', 18) + 'Já autorizei, conectar</button></div>');
 
+  const mon = s.monitor || {mudancas:[]};
+  const vigia = sec('sv', 'Vigilância automática', '<p class="sub" style="margin:0 0 10px">O FiscoFácil confere o cadastro desta empresa na Receita ' + esc(mon.frequencia || 'todos os dias') + ' e os documentos que vencem. Se algo mudar, você recebe um alerta e um e-mail.' +
+    (mon.ultimaRodada ? ' Última rodada: <b>' + fmtDT(mon.ultimaRodada) + '</b>.' : ' A primeira rodada acontece nas próximas horas.') + '</p>' +
+    (mon.mudancas.length
+      ? '<ol class="timeline">' + mon.mudancas.map(m => '<li class="' + (m.gravidade === 'alerta' ? 'alerta' : m.gravidade === 'info' ? 'ok' : '') + '"><time>' + fmtDT(m.detectadoEm) + '</time><span><b>' + esc(m.rotulo) + '</b>: ' + esc(m.texto.replace(/^[^:]*: /, '')) + '</span></li>').join('') + '</ol>'
+      : '<p class="hint">Nenhuma mudança detectada desde que a empresa foi cadastrada.</p>'));
   const cnpjF = fmtCnpj(e.cnpj || '');
   const atalhos = sec('sa', 'Atalhos oficiais', '<p class="sub" style="margin:0 0 12px">Sites do governo para conferir, emitir guias e tirar certidões. Os sites pedem o CNPJ: copie aqui e cole lá.</p>' +
     '<div class="cnpjcopy"><span class="num">' + esc(cnpjF) + '</span><button class="btn ghost sm" data-action="copiar-cnpj" data-cnpj="' + esc(cnpjF) + '">' + ic('copy', 16) + 'Copiar CNPJ</button></div>' +
@@ -1809,7 +1815,7 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + numerosInicio() + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + meiSec + passos + '</div><div class="stack">' + dados + atalhos + linha + '</div></div>' + limites;
+    veredito + numerosInicio() + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + meiSec + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
 }
 
 

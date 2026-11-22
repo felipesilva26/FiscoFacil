@@ -149,4 +149,31 @@ update users set anonimo = true where anonimo = false and email like 'visitante-
 create index if not exists notas_empresa_data on notas_fiscais (empresa_id, data_emissao);
 create index if not exists auditoria_criado on auditoria (criado_em);
 create unique index if not exists notas_chave_unica on notas_fiscais (empresa_id, chave) where chave is not null;
+
+-- Monitoramento diário: histórico do que mudou no cadastro público de cada empresa.
+create table if not exists mudancas_cadastro (
+  id text primary key,
+  empresa_id text not null references empresas(id) on delete cascade,
+  campo text not null,
+  rotulo text not null,
+  antes text,
+  depois text,
+  gravidade text not null,          -- 'alerta' (vermelho) | 'atencao' (amarelo) | 'info' (verde)
+  texto text not null,
+  fonte text not null,
+  detectado_em timestamptz not null default now()
+);
+create index if not exists mudancas_empresa on mudancas_cadastro (empresa_id, detectado_em desc);
+-- Chave opcional para o mesmo aviso não se repetir (ex.: certidão que vence em 7 dias).
+alter table alertas add column if not exists chave text;
+create unique index if not exists alertas_chave_unica on alertas (user_id, chave) where chave is not null;
+-- Cada rodada do robô de monitoramento.
+create table if not exists monitor_execucoes (
+  id serial primary key,
+  iniciado_em timestamptz not null default now(),
+  concluido_em timestamptz,
+  empresas integer not null default 0,
+  mudancas integer not null default 0,
+  falhas integer not null default 0
+);
 `;

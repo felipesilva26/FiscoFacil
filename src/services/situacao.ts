@@ -2,13 +2,14 @@ import { avaliarCadastro, lookupCnpj, regimePelaReceita, type Cadastral } from '
 import type { Ctx } from '../ctx.js';
 import type { Row } from '../db.js';
 import { dividaDoCnpj, estadoPgfn } from '../pgfn/importador.js';
-import { newId, todayISO, diffDays } from '../util.js';
+import { todayISO, diffDays } from '../util.js';
 import { resumoEmpresa } from './dominio.js';
 import { competenciasMei, ehMei } from './dasmei.js';
+import { compararCadastro, historicoMudancas, registrarMudancas, resumoMonitor } from './monitor.js';
 
 type Nivel = 'ok' | 'alerta' | 'pendente' | 'info';
 
-/** Consulta o cadastro público, guarda e avisa se algo importante mudou. */
+/** Consulta o cadastro público, guarda e registra (histórico, alerta e e-mail) o que mudou desde a última consulta. */
 export async function atualizarCadastro(ctx: Ctx, e: Row): Promise<Cadastral> {
   const novo = await lookupCnpj(e.cnpj, { url: ctx.cfg.cnpjLookupUrl, fetchImpl: ctx.fetchImpl, now: ctx.now(), log: (m) => console.warn(m) });
   const antigo = (e.cadastral ?? null) as Cadastral | null;
@@ -20,32 +21,8 @@ export async function atualizarCadastro(ctx: Ctx, e: Row): Promise<Cadastral> {
   } else if (reg && !reg.regime && (e.regime === 'MEI' || e.regime === 'Simples Nacional')) {
     await ctx.db.query("update empresas set regime = 'Lucro Presumido' where id = $1", [e.id]);
   }
-  if (antigo && antigo.situacao) {
-    const mudou: string[] = [];
-    if (antigo.situacao !== novo.situacao) mudou.push(`a situação cadastral mudou de ${antigo.situacao} para ${novo.situacao ?? 'desconhecida'}`);
-    if (antigo.simples === true && novo.simples === false) mudou.push('a empresa saiu do Simples Nacional');
-    if (antigo.mei === true && novo.mei === false) mudou.push('a empresa deixou de ser MEI');
-    if (mudou.length) {
-      const { rows } = await ctx.db.query('select email from users where id = $1', [e.user_id]);
-      const texto = `${e.nome}: ${mudou.join('; ')}.`;
-      await ctx.db.query('insert into alertas (id, user_id, empresa_id, nivel, texto, fonte) values ($1,$2,$3,$4,$5,$6)',
-        [newId(), e.user_id, e.id, 'alerta', texto, novo.fonte]);
-      if (rows[0]) await ctx.notifier.send({ to: rows[0].email, subject: 'FiscoFácil: mudança no cadastro da empresa', text: `${texto}\n\nFonte: ${novo.fonte}.` }).catch(() => undefined);
-    }
-  }
+  await registrarMudancas(ctx, e, compararCadastro(antigo, novo), novo.fonte);
   return novo;
-}
-
-/** Atualiza o cadastro das empresas consultadas há mais de `dias` dias. */
-export async function atualizarCadastrosAntigos(ctx: Ctx, dias = 7): Promise<number> {
-  const { rows } = await ctx.db.query('select * from empresas where cnpj is not null');
-  let n = 0;
-  for (const e of rows) {
-    const ultima = (e.cadastral as Cadastral | null)?.consultadoEm;
-    if (ultima && diffDays(todayISO(ctx.now()), todayISO(new Date(ultima))) < dias) continue;
-    try { await atualizarCadastro(ctx, e); n++; } catch { /* tenta de novo na próxima rodada */ }
-  }
-  return n;
 }
 
 export async function situacaoFiscal(ctx: Ctx, e: Row) {
@@ -113,7 +90,8 @@ export async function situacaoFiscal(ctx: Ctx, e: Row) {
 
   return {
     empresa: { id: e.id, nome: e.nome, cnpj: e.cnpj },
-    resumo, blocos, cadastro: cad, divida, guias, certidoes, mei, pgfnRodando: estadoPgfn.rodando || (!!divida && !divida.verificado && !estadoPgfn.ultimoErro),
+    resumo, blocos, cadastro: cad, divida, guias, certidoes, mei,
+    monitor: { ...(await resumoMonitor(ctx)), mudancas: await historicoMudancas(ctx, e.id) }, pgfnRodando: estadoPgfn.rodando || (!!divida && !divida.verificado && !estadoPgfn.ultimoErro),
     procuracao: { conectada: !!e.receita_conectada, procuradorCnpj: ctx.cfg.procuradorCnpj || null, servicoConfigurado: receitaPronta },
     naoCobre: ['ICMS (cada estado tem o seu sistema)', 'ISS e taxas municipais (cada prefeitura tem o seu)', 'Débitos ainda não inscritos em dívida ativa, sem a procuração no e-CAC'],
   };

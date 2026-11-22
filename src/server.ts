@@ -9,7 +9,7 @@ import { SemReceita } from './receita/provider.js';
 import { SerproReceitaProvider } from './receita/serpro.js';
 import { ConsoleNotifier, SmtpNotifier } from './services/notifier.js';
 import { runReminders } from './services/reminders.js';
-import { atualizarCadastrosAntigos } from './services/situacao.js';
+import { rodarMonitorSeVencido } from './services/monitor.js';
 import { agendarPgfn, rodarPgfn } from './pgfn/importador.js';
 import { limparDadosAntigos } from './routes/conta.js';
 
@@ -36,7 +36,8 @@ const app = await buildApp(ctx);
 // Lembretes: confere a cada hora; cada aviso só sai uma vez (tabela lembretes_enviados).
 const timer = setInterval(() => {
   runReminders(ctx).catch((e) => app.log.error(e));
-  atualizarCadastrosAntigos(ctx).catch((e) => app.log.error(e));
+  // Robô de monitoramento: uma rodada por dia (cadastro de todas as empresas + validade das certidões).
+  rodarMonitorSeVencido(ctx).then((r) => r && !r.ocupado && app.log.info(r, 'monitor: rodada concluída')).catch((e) => app.log.error(e));
   // Dívida ativa (PGFN): de madrugada, só quando há trimestre novo ou CNPJ ainda não conferido.
   const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
   if (hora === 3 && process.env.PGFN_DESLIGADO !== '1') void rodarPgfn(ctx);
@@ -51,6 +52,8 @@ process.on('SIGTERM', parar);
 await app.listen({ port: cfg.port, host: '0.0.0.0' });
 // Confere na PGFN os CNPJs que ainda não foram conferidos (não baixa nada se já estiver tudo em dia).
 agendarPgfn(ctx, 20_000);
+// Primeira rodada do robô logo depois de subir, se já passou de um dia desde a última.
+setTimeout(() => { rodarMonitorSeVencido(ctx).catch((e) => app.log.error(e)); }, 90_000).unref();
 db.query('select trimestre, origem, linhas, encontrados, cnpjs_verificados, concluido_em from pgfn_importacoes order by concluido_em')
   .then((r) => app.log.info({ pgfnImportacoes: r.rows }, 'PGFN: importações já feitas'))
   .catch(() => undefined);
