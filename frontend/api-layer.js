@@ -553,7 +553,7 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + numerosInicio() + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + divida + meiSec + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
+    veredito + confirmarMei(s) + numerosInicio(s) + '<div class="cols" style="margin-top:20px"><div class="stack">' + meiSec + lista + divida + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
 }
 
 
@@ -569,13 +569,24 @@ route = function(){
 };
 pgInicio = function(){ return pgSituacao(); };
 /** Três números que resumem as guias cadastradas (o resto da tela vem das fontes oficiais). */
-function numerosInicio(){
-  const st = stats(), mesNome = MESES[today().getMonth()].toLowerCase();
+/** Meses do DAS-MEI já vencidos que o dono ainda não confirmou (o sistema só sabe se pagou quando ele marca). */
+function meiPendentes(s){ const l = (s && s.mei) || []; const m = l.filter(x => x.vencida && x.status === 'nao_confirmado'); return {n:m.length, valor:m.reduce((t, x) => t + (x.valor || 0), 0), pagos:l.filter(x => x.status === 'pago').reduce((t, x) => t + (x.valor || 0), 0), tem:l.length > 0}; }
+ACT['ir-mei'] = () => { const el = $('#sm'); if (el) el.closest('section').scrollIntoView({behavior:'smooth', block:'start'}); };
+function confirmarMei(s){
+  const m = meiPendentes(s); if (!m.n) return '';
+  return '<section class="card" style="margin-top:16px;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><b>Falta confirmar ' + m.n + (m.n === 1 ? ' mês' : ' meses') + ' do DAS-MEI</b>' +
+    '<p class="hint" style="margin:4px 0 0">Pela tabela oficial somam ' + reais(m.valor) + '. Marque "Paguei" ou "Não paguei" em cada mês e este painel passa a mostrar o que está pago e o que está em aberto.</p></div>' +
+    '<button class="btn primary" data-action="ir-mei">Confirmar agora</button></section>';
+}
+function numerosInicio(s){
+  const st = stats(), mesNome = MESES[today().getMonth()].toLowerCase(), m = meiPendentes(s);
   const kp = (icone, tom, rot, sub, val, vt) => '<div class="card kpi"><span class="kicon ' + tom + '">' + icone + '</span><div><div class="klabel">' + rot + '</div><div class="ksub">' + sub + '</div><div class="kval' + (vt ? ' ' + vt : '') + '">' + val + '</div></div></div>';
   return '<div class="kpis kpis3" style="margin-top:20px">' +
-    kp(ic('alert', 24), 'bad', 'Total pendente', 'guias em aberto', brl(st.totalPend), st.totalPend ? 'bad' : '') +
+    kp(ic('alert', 24), 'bad', 'Em aberto', m.n ? 'guias em aberto + ' + reais(m.valor) + ' a confirmar' : 'guias em aberto', brl(st.totalPend), st.totalPend ? 'bad' : '') +
     kp(ic('calendar', 24), 'brand', 'Vencem em 7 dias', st.prox7.length === 1 ? 'guia' : 'guias', st.prox7.length) +
-    kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, 'pagamentos registrados', brl(st.pagosMes), 'ok') + '</div>';
+    (m.tem
+      ? kp(ic('check', 24), 'ok', 'Pago', 'DAS-MEI confirmados (últimos meses)', brl(Math.max(m.pagos, st.pagosMes)), 'ok')
+      : kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, 'pagamentos registrados', brl(st.pagosMes), 'ok')) + '</div>';
 }
 /* Guias e calendário na mesma tela, com um seletor. */
 ui.gv = ui.gv || 'lista';
