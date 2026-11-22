@@ -13,5 +13,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY public ./public
+COPY frontend/privacidade.html ./frontend/privacidade.html
 EXPOSE 3000
 CMD ["node", "dist/server.js"]
