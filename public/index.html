@@ -802,6 +802,28 @@ button.pt{cursor:pointer}button.pt:hover b{text-decoration:underline}
 .mesbars{height:70px!important;min-height:0}
 .dgrid{gap:20px}
 
+/* Ações imediatas: cards menores e com brilho */
+.car .al{flex-basis:218px;padding:8px 11px;gap:2px;border-radius:11px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#FFF1F1 0%,#FFE4E4 100%);
+  --glow:239,68,68;box-shadow:0 0 0 1px rgba(var(--glow),.25),0 0 14px rgba(var(--glow),.38);animation:alglow 2.6s ease-in-out infinite}
+.car .al.warn{background:linear-gradient(135deg,#FFFBEA 0%,#FFF1C7 100%);--glow:224,161,0}
+.car .al.info{background:linear-gradient(135deg,#F3F7FF 0%,#E1EBFF 100%);--glow:59,110,255}
+.car .al.ok{background:linear-gradient(135deg,#F1FBF4 0%,#D9F5E3 100%);--glow:34,170,90}
+.car .al::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-18deg);animation:alshine 5s ease-in-out infinite;pointer-events:none}
+.car .al b{font-size:13.5px}
+.car .al .t{font-size:10px}
+.car .al .tx{font-size:11.5px;line-height:1.3}
+.car .al .btn{padding:4px 10px;font-size:11.5px;border-radius:9px;margin-top:3px}
+@keyframes alglow{0%,100%{box-shadow:0 0 0 1px rgba(var(--glow),.25),0 0 10px rgba(var(--glow),.28)}50%{box-shadow:0 0 0 1px rgba(var(--glow),.5),0 0 22px rgba(var(--glow),.6)}}
+@keyframes alshine{0%,55%{left:-60%}100%{left:130%}}
+:root[data-theme=dark] .car .al{background:linear-gradient(135deg,#3A1D21,#2A1417)}
+:root[data-theme=dark] .car .al.warn{background:linear-gradient(135deg,#3A2E10,#2A210B)}
+:root[data-theme=dark] .car .al.info{background:linear-gradient(135deg,#1C2C52,#131E3A)}
+:root[data-theme=dark] .car .al.ok{background:linear-gradient(135deg,#15382A,#0F2A1E)}
+:root[data-theme=dark] .car .al::after{background:linear-gradient(100deg,transparent,rgba(255,255,255,.14),transparent)}
+@media (prefers-reduced-motion:reduce){.car .al,.car .al::after{animation:none}}
+.car .carr{padding:12px 8px 14px;margin:-8px -6px -6px}
+
 </style>
 
 <div class="frame" id="frame">
