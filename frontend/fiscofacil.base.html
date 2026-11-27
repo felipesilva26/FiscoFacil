@@ -797,6 +797,12 @@ function renderModal(){
       field('nvalor', 'Valor (R$)', '<input id="nvalor" class="in" inputmode="decimal" placeholder="1.250,00">') +
       field('ncod', 'Linha digitável ou código de barras (opcional)', '<input id="ncod" class="in" autocomplete="off">') +
       '<p class="err" id="ferr" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-action="fechar">Cancelar</button><button class="btn primary" type="submit">Adicionar</button></div></form>';
+  } else if (m.t === 'debitos') {
+    title = 'Cadastrar débitos em atraso';
+    body = '<form id="formDebitos" class="form"><p class="sub" style="margin:0">Cole uma linha por mês, com a competência e o valor, por exemplo <b>01/2026 2.360,02</b>. Serve para débitos que você já sabe que estão em aberto (valor atualizado).</p>' +
+      '<div class="formrow">' + field('dtrib', 'Tributo', '<select id="dtrib" class="in">' + Object.keys(TRIB).map(k => '<option value="' + k + '">' + esc(TRIB[k]) + '</option>').join('') + '</select>') + field('ddia', 'Vence todo dia', '<input id="ddia" class="in" inputmode="numeric" value="20" style="max-width:90px">', 'do mês seguinte à competência (DAS: dia 20)') + '</div>' +
+      field('dtexto', 'Competências e valores', '<textarea id="dtexto" class="in" rows="9" placeholder="01/2026 2.360,02&#10;02/2026 20.778,19" style="font-family:inherit"></textarea>') +
+      '<p class="err" id="ferr" role="alert"></p><div class="actions"><button type="button" class="btn ghost" data-action="fechar">Cancelar</button><button class="btn primary" type="submit">Cadastrar débitos</button></div></form>';
   } else if (m.t === 'pagar') {
     const o = S.obrigacoes.find(x => x.id === m.id); if (!o) { ui.modal = null; box.innerHTML = ''; return; }
     title = 'Registrar pagamento';
@@ -848,6 +854,7 @@ const find = id => S.obrigacoes.find(o => o.id === id);
 const closeModal = () => { ui.modal = null; ui.confirm = null; renderModal(); };
 const ACT = {
   nova(el){ ui.modal = {t:'nova', venc:el.dataset.venc || ''}; renderModal(); },
+  debitos(){ ui.modal = {t:'debitos'}; renderModal(); },
   fechar(){ const c = ui.confirm; closeModal(); if (c === 'restaurar') renderMain(); },
   detalhe(el){ ui.alerts = false; renderTop(); ui.confirm = null; ui.modal = {t:'detalhe', id:el.dataset.id}; renderModal(); },
   pagar(el){ ui.modal = {t:'pagar', id:el.dataset.id}; renderModal(); },

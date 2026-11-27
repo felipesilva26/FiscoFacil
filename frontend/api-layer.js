@@ -218,6 +218,27 @@ const SUB = {
     if (file) await enviar(o.empresaId, file, 'Comprovante');
     await refresh('Pagamento registrado.');
   },
+  async formDebitos(){
+    const trib = $('#dtrib').value, dia = Math.min(28, Math.max(1, parseInt($('#ddia').value, 10) || 20));
+    const itens = [];
+    $('#dtexto').value.split(/\n+/).forEach(l => {
+      const m = l.match(/(\d{1,2})\s*\/\s*(\d{4})\D+?(\d{1,3}(?:\.\d{3})*,\d{2})/);
+      if (!m || /total/i.test(l)) return;
+      const mes = +m[1], ano = +m[2], val = parseMoney(m[3]);
+      if (mes < 1 || mes > 12 || ano < 2000 || !(val > 0)) return;
+      const py = mes === 12 ? ano + 1 : ano, pm = mes === 12 ? 1 : mes + 1;
+      itens.push({comp:('0' + mes).slice(-2) + '/' + ano, venc:py + '-' + ('0' + pm).slice(-2) + '-' + ('0' + dia).slice(-2), valor:val});
+    });
+    if (!itens.length) throw new Error('Não encontrei linhas no formato 01/2026 2.360,02.');
+    let feitos = 0, soma = 0;
+    for (const it of itens) {
+      const ja = S.obrigacoes.some(o => o.tributo === trib && o.venc === it.venc && Math.abs(o.valor - it.valor) < 0.01);
+      if (ja) continue;
+      await api('POST', '/api/empresas/' + S.empresaId + '/obrigacoes', {tributo:trib, venc:it.venc, valor:it.valor, codigo:'Débito em atraso ' + it.comp});
+      feitos++; soma += it.valor;
+    }
+    await refresh(feitos ? feitos + ' débitos cadastrados (' + brl(soma) + ').' : 'Esses débitos já estavam cadastrados.');
+  },
   async formLer(f){
     const k = f.dataset.k, L = ui.modal.r.leitura;
     if (k === 'guia') {
@@ -605,7 +626,7 @@ function numerosInicio(s){
     return '<section class="card comece" style="margin-top:20px">' + entrada +
       '<h2 style="margin:0 0 6px">Ainda não há guias registradas</h2>' +
       '<p class="sub" style="margin:0 0 14px;max-width:70ch">Por isso o que está <b>em aberto</b>, o que <b>vence em 7 dias</b> e o que foi <b>pago</b> aparecem vazios. O FiscoFácil não vê as guias na Receita sozinho (isso depende da conexão com o Serpro, ainda não ativa). Mas ele <b>lê o PDF da guia</b>: anexe o DAS e o valor, o vencimento e o código entram em segundos.</p>' +
-      '<div class="actions" style="justify-content:flex-start;flex-wrap:wrap">' + botaoAnexar('primary') + '<button class="btn ghost" data-action="nova">' + ic('plus', 18) + 'Cadastrar guia manualmente</button></div>' +
+      '<div class="actions" style="justify-content:flex-start;flex-wrap:wrap">' + botaoAnexar('primary') + '<button class="btn ghost" data-action="nova">' + ic('plus', 18) + 'Cadastrar guia manualmente</button><button class="btn ghost" data-action="debitos">Cadastrar débitos em atraso</button></div>' +
       '<p class="hint" style="margin:12px 0 0">Dica: pode anexar vários PDFs de uma vez, inclusive comprovantes de pagamento: o sistema marca a guia como paga. Depois da conexão com a Receita, isso passa a ser automático.</p></section>';
   }
   const kp = (icone, tom, rot, sub, val, vt) => '<div class="card kpi"><span class="kicon ' + tom + '">' + icone + '</span><div><div class="klabel">' + rot + '</div><div class="ksub">' + sub + '</div><div class="kval' + (vt ? ' ' + vt : '') + '">' + val + '</div></div></div>';
@@ -616,7 +637,7 @@ function numerosInicio(s){
     (m.tem
       ? kp(ic('check', 24), 'ok', 'Pago', pagoMei ? 'DAS-MEI confirmados (últimos meses)' : 'confirme os meses do DAS-MEI abaixo', brl(pagoMei), 'ok')
       : kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, st.pagosMes ? 'pagamentos registrados' : 'nenhum pagamento registrado neste mês', brl(st.pagosMes), 'ok')) + '</div>' +
-    '<div class="actions anexarlinha" style="justify-content:flex-start;margin-top:12px">' + entrada + botaoAnexar('soft sm') + '<span class="hint">Anexe o PDF da guia ou do comprovante: o sistema lê e você só confere.</span></div>';
+    '<div class="actions anexarlinha" style="justify-content:flex-start;margin-top:12px">' + entrada + botaoAnexar('soft sm') + '<button class="btn ghost sm" data-action="debitos">Cadastrar débitos em atraso</button><span class="hint">Anexe o PDF da guia ou do comprovante: o sistema lê e você só confere.</span></div>';
 }
 /* Anexar vários PDFs de uma vez, direto no Início: lê todos e pede a conferência um a um. */
 let lerFila = [], lerTotal = 0;
