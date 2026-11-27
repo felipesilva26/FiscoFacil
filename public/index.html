@@ -2131,7 +2131,7 @@ function saudeFiscal(s, veredito){
   const emAtraso = st.atrasadas.reduce((a, o) => a + o.valor, 0);
   const aVencer = st.abertas.filter(o => o.venc >= ti).sort((a, b) => a.venc < b.venc ? -1 : 1);
   const prox = aVencer[0];
-  const oficialRuim = r.nivel === 'alerta';
+  const oficialRuim = (s.blocos || []).some(b => b.id !== 'guias' && b.nivel === 'alerta');
   const semDados = !st.L.length;
   let nivel, palavra, regra;
   if (st.atrasadas.length || oficialRuim) { nivel = 'irregular'; palavra = 'Irregular'; regra = st.atrasadas.length ? 'Há guia atrasada.' : 'Há pendência nas fontes oficiais.'; }
