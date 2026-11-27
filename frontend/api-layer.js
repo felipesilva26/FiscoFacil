@@ -929,7 +929,7 @@ function painelAvisos(){
     .concat(itens.map(x => { if (x.n) return '<button class="pt rec" data-action="recebi" data-id="' + x.n.id + '" title="Clique para marcar como recebido"><small>' + quando(x.d) + '</small><b>Receber ' + brl(x.n.valor) + '</b><span>' + esc(cli(x.n)) + (x.n.numero ? ' · nota nº ' + esc(x.n.numero) : '') + '</span></button>';
       const o = x.o, d = diffDays(o.venc, t); return '<button class="pt ' + (o.pagoEm ? 'ok' : d <= 7 ? 'warn' : '') + '" data-action="abrir-pagamento" data-id="' + o.id + '"><small>' + quando(o.venc) + '</small><b>' + esc(rotulo(o)) + '</b><span>' + (o.pagoEm ? 'Já paga em ' + fmtDate(o.pagoEm) : brl(o.valor)) + '</span></button>'; }));
   const linha = '<section class="card proximos"><div class="chead"><h2>O que vem a seguir</h2>' + (itens.length ? '' : '<span class="hint">Anexe as próximas guias e notas de venda para aparecerem aqui.</span>') + '</div>' + carrossel('crono', pontos) + '</section>';
-  return aviso + grafico + linha;
+  return aviso + '<div class="duo">' + grafico + linha + '</div>';
 }
 
 /* ---------- Carrossel: arrastar com o mouse e setas ---------- */

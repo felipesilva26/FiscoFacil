@@ -434,3 +434,32 @@ button.pt{cursor:pointer}button.pt:hover b{text-decoration:underline}
 :root[data-theme=dark] .nav a,:root[data-theme=dark] .sairbtn{color:var(--side-ink)}
 :root[data-theme=dark] .nav a[aria-current="page"]{color:#fff}
 .car.noprev .carnav.prev,.car.nonext .carnav.next{display:none}
+
+/* ===== Menos espaço vazio ===== */
+.col #main .pagehead{justify-content:flex-start;align-items:center;gap:6px 18px}
+.col #main .pagehead .pagetools{margin-left:4px}
+.card{padding:16px 18px}
+.chead{margin-bottom:10px}
+.col #main{display:flex;flex-direction:column;gap:14px}
+.col #main>*{margin-top:0!important}
+.car .al{flex-basis:260px;padding:10px 12px;gap:3px}
+.al .btn{margin-top:4px}
+.pt{padding-top:10px}
+.car .pt{flex-basis:170px}
+.proximos .carr{padding-bottom:2px}
+@container app (min-width:900px){
+  .cols{display:block!important;column-count:2;column-gap:14px}
+  .cols>.stack{display:contents}
+  .cols .card{break-inside:avoid;margin-bottom:14px}
+}
+.cols .card h2{font-size:16px}
+.cols .card p,.cols .card li{font-size:13px}
+.cols .card .btn{padding:6px 10px}
+.duo{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:stretch}
+.duo>.card{margin:0}
+@container app (max-width:900px){.duo{grid-template-columns:1fr}}
+.duo .barras{height:120px}
+.duo .leg{font-size:12px;gap:10px}
+.duo .bcol .bv{display:none}
+.mesbars{height:70px!important;min-height:0}
+.dgrid{gap:20px}
