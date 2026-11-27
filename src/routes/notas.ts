@@ -24,12 +24,14 @@ const nova = z.object({
   contraparteNome: z.string().trim().max(200).nullable().optional(),
   valor: z.number().positive('O valor precisa ser maior que zero.').max(1e10),
   impostos: z.record(z.string(), z.number().nonnegative()).default({}),
+  receberEm: z.string().refine(isISODate, 'Data de recebimento inválida.').nullable().optional(),
 });
 
 const toNota = (r: Row) => ({
   id: r.id, empresaId: r.empresa_id, documentoId: r.documento_id, tipo: r.tipo, chave: r.chave, numero: r.numero, serie: r.serie,
   dataEmissao: r.data_emissao, direcao: r.direcao, contraparteDoc: r.contraparte_doc, contraparteNome: r.contraparte_nome,
   valor: Number(r.valor_centavos) / 100, impostos: r.impostos ?? {},
+  receberEm: (r.receber_em as string | null) ?? null, recebidoEm: (r.recebido_em as string | null) ?? null,
 });
 
 async function inserir(ctx: Ctx, empresaId: string, b: z.infer<typeof nova>): Promise<{ nota: ReturnType<typeof toNota>; repetida: boolean }> {
@@ -39,10 +41,10 @@ async function inserir(ctx: Ctx, empresaId: string, b: z.infer<typeof nova>): Pr
   }
   const id = newId();
   await ctx.db.query(
-    `insert into notas_fiscais (id, empresa_id, documento_id, tipo, chave, numero, serie, data_emissao, direcao, contraparte_doc, contraparte_nome, valor_centavos, impostos)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    `insert into notas_fiscais (id, empresa_id, documento_id, tipo, chave, numero, serie, data_emissao, direcao, contraparte_doc, contraparte_nome, valor_centavos, impostos, receber_em)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [id, empresaId, b.documentoId ?? null, b.tipo, b.chave ?? null, b.numero ?? null, b.serie ?? null, b.dataEmissao, b.direcao,
-      b.contraparteDoc ? onlyDigits(b.contraparteDoc) : null, b.contraparteNome ?? null, Math.round(b.valor * 100), JSON.stringify(b.impostos ?? {})]);
+      b.contraparteDoc ? onlyDigits(b.contraparteDoc) : null, b.contraparteNome ?? null, Math.round(b.valor * 100), JSON.stringify(b.impostos ?? {}), b.direcao === 'emitida' ? b.receberEm ?? null : null]);
   const { rows } = await ctx.db.query('select * from notas_fiscais where id = $1', [id]);
   return { nota: toNota(rows[0]), repetida: false };
 }
@@ -145,9 +147,25 @@ export async function notasRoutes(app: FastifyInstance, ctx: Ctx) {
     const docId = await guardarArquivo(ctx, e.id, { nome: basename(parte.filename || 'nota.xml').replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_').slice(0, 200), tipo: 'Nota fiscal', buf });
     const outra = n.direcao === 'emitida' ? n.destinatario : n.emitente;
     const r = await inserir(ctx, e.id, { documentoId: docId, tipo: n.tipo, chave: n.chave, numero: n.numero, serie: n.serie, dataEmissao: n.dataEmissao,
-      direcao: n.direcao, contraparteDoc: outra.doc, contraparteNome: outra.nome, valor: n.valor, impostos: Object.fromEntries(Object.entries(n.impostos).filter(([, v]) => v != null)) as Record<string, number> });
+      direcao: n.direcao, contraparteDoc: outra.doc, contraparteNome: outra.nome, valor: n.valor, impostos: Object.fromEntries(Object.entries(n.impostos).filter(([, v]) => v != null)) as Record<string, number>, receberEm: n.receberEm });
     return reply.code(201).send(r);
   });
+
+  /** Confirma que o dinheiro de uma venda entrou (ou desfaz). */
+  for (const [rota, desfaz] of [['recebido', false], ['desfazer-recebimento', true]] as const) {
+    app.post(`/api/notas/:id/${rota}`, { preHandler: guard }, async (req, reply) => {
+      const { rows } = await ctx.db.query('select n.* from notas_fiscais n join empresas e on e.id = n.empresa_id where n.id = $1 and e.user_id = $2', [(req.params as { id: string }).id, req.userId]);
+      if (!rows.length) return reply.code(404).send({ erro: 'Nota não encontrada.' });
+      const hoje = todayISO(ctx.now());
+      const b = z.object({ data: z.string().refine(isISODate).optional() }).parse(req.body ?? {});
+      const quando = desfaz ? null : b.data ?? hoje;
+      if (quando && quando > hoje) return reply.code(400).send({ erro: 'A data do recebimento não pode ser no futuro.' });
+      await ctx.db.query('update notas_fiscais set recebido_em = $1 where id = $2', [quando, rows[0].id]);
+      await auditar(ctx, req.userId, rows[0].empresa_id, desfaz ? 'nota.desfazer_recebimento' : 'nota.recebido', { id: rows[0].id });
+      const r = await ctx.db.query('select * from notas_fiscais where id = $1', [rows[0].id]);
+      return toNota(r.rows[0]);
+    });
+  }
 
   app.delete('/api/notas/:id', { preHandler: guard }, async (req, reply) => {
     const { rows } = await ctx.db.query('select n.* from notas_fiscais n join empresas e on e.id = n.empresa_id where n.id = $1 and e.user_id = $2', [(req.params as { id: string }).id, req.userId]);

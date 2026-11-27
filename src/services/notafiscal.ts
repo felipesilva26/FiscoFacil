@@ -21,6 +21,8 @@ export interface NotaLida {
   natureza: string | null;
   direcao: 'emitida' | 'recebida' | 'outra';
   origem: 'xml' | 'pdf';
+  /** Data prevista de pagamento (vencimento da cobrança/duplicata), AAAA-MM-DD, quando a nota traz. */
+  receberEm: string | null;
   confianca: 'alta' | 'media' | 'baixa';
   avisos: string[];
 }
@@ -108,7 +110,7 @@ export function lerNotaXml(xml: string, cnpjEmpresa?: string | null): NotaLida {
       dataEmissao: dataDe(tag(ide, 'dhEmi', 'dEmi')), emitente: parte(bloco(xml, 'emit')), destinatario: parte(bloco(xml, 'dest')),
       valor: num(tag(tot, 'vNF')) ?? null,
       impostos: { icms: num(tag(tot, 'vICMS')), ipi: num(tag(tot, 'vIPI')), pis: num(tag(tot, 'vPIS')), cofins: num(tag(tot, 'vCOFINS')) },
-      natureza: tag(ide, 'natOp'), origem: 'xml',
+      natureza: tag(ide, 'natOp'), origem: 'xml', receberEm: dataDe(tag(bloco(xml, 'cobr') ?? '', 'dVenc')),
     }, cnpjEmpresa);
   }
   // NFS-e: padrão nacional (emit/toma) e padrão ABRASF das prefeituras (Prestador/Tomador).
@@ -121,7 +123,7 @@ export function lerNotaXml(xml: string, cnpjEmpresa?: string | null): NotaLida {
     emitente: parte(emit), destinatario: parte(toma),
     valor: num(tag(xml, 'vLiq', 'ValorLiquidoNfse', 'vServ', 'ValorServicos')) ?? null,
     impostos: { iss: num(tag(xml, 'vISSQN', 'ValorIss')), pis: num(tag(xml, 'vPIS', 'ValorPis')), cofins: num(tag(xml, 'vCOFINS', 'ValorCofins')) },
-    natureza: tag(xml, 'xDescServ', 'Discriminacao'), origem: 'xml',
+    natureza: tag(xml, 'xDescServ', 'Discriminacao'), origem: 'xml', receberEm: dataDe(tag(xml, 'dVenc', 'DataVencimento')),
   }, cnpjEmpresa);
 }
 
@@ -156,7 +158,7 @@ export function lerNotaTexto(texto: string, cnpjEmpresa?: string | null): NotaLi
     dataEmissao: dataDe(data), emitente: { doc: emitDoc, nome: null }, destinatario: { doc: destDoc, nome: null },
     valor: valorTxt ? num(valorTxt) ?? null : null,
     impostos: servico ? { iss: num(depois(t, /valor (?:do )?iss(?:qn)?/, MONEY) ?? undefined) } : { icms: num(depois(t, /valor do icms(?! st| substitui)/, MONEY) ?? undefined), ipi: num(depois(t, /valor (?:total )?do ipi/, MONEY) ?? undefined) },
-    natureza: null, origem: 'pdf',
+    natureza: null, origem: 'pdf', receberEm: dataDe(depois(t, /vencimento|data de pagamento|pagar at[ée]|pag[áa]vel at[ée]/, '(\\d{2}\\/\\d{2}\\/\\d{4})', 80)),
   }, cnpjEmpresa);
 }
 

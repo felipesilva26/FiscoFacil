@@ -40,6 +40,12 @@ describe('nota fiscal: leitura', () => {
     assert.equal(x.direcao, 'outra'); assert.match(x.avisos[0], /não tem o CNPJ/);
     assert.equal(lerNotaXml(nfeXml({ emit: MEU, dest: CLIENTE, numero: 2, valor: '10.00', data: '2026-10-05', modelo: '65' }), MEU).tipo, 'NFC-e');
   });
+  test('XML de NF-e traz a data prevista de recebimento (cobrança/duplicata)', () => {
+    const xml = nfeXml({ emit: MEU, dest: CLIENTE, numero: 21, valor: '10000.00', data: '2026-11-20' }).replace('</infNFe>', '<cobr><dup><nDup>001</nDup><dVenc>2026-12-03</dVenc><vDup>10000.00</vDup></dup></cobr></infNFe>');
+    const n = lerNotaXml(xml, MEU);
+    assert.equal(n.receberEm, '2026-12-03'); assert.equal(n.valor, 10000);
+    assert.equal(lerNotaXml(nfeXml({ emit: MEU, dest: CLIENTE, numero: 22, valor: '1.00', data: '2026-11-20' }), MEU).receberEm, null);
+  });
   test('XML de NFS-e no padrão nacional', () => {
     const xml = `<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse"><infNFSe Id="NFS${'3'.repeat(50)}"><nNFSe>42</nNFSe><dhProc>2026-09-10T08:00:00-03:00</dhProc>
 <emit><CNPJ>${MEU}</CNPJ><xNome>MEU MEI</xNome></emit><valores><vLiq>800.00</vLiq></valores><DPS><infDPS><toma><CNPJ>${CLIENTE}</CNPJ><xNome>CLIENTE</xNome></toma>
@@ -100,6 +106,15 @@ describe('nota fiscal: pela API', () => {
     assert.ok(r.mei); assert.equal(r.mei.usado, 1250.5); assert.equal(r.mei.situacao, 'ok');
     assert.equal((await t.app.inject({ method: 'GET', url: `/api/empresas/${e.id}/documentos`, headers: h })).json().length, 1);
 
+    const v = await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/notas`, headers: h, payload: { tipo: 'NF-e', dataEmissao: '2026-11-27', direcao: 'emitida', valor: 10000, contraparteNome: 'Cliente', receberEm: '2026-12-03' } });
+    assert.equal(v.statusCode, 201); assert.equal(v.json().nota.receberEm, '2026-12-03'); assert.equal(v.json().nota.recebidoEm, null);
+    const compra = await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/notas`, headers: h, payload: { tipo: 'NF-e', dataEmissao: '2026-11-27', direcao: 'recebida', valor: 5, receberEm: '2026-12-03' } });
+    assert.equal(compra.json().nota.receberEm, null);
+    const rec = await t.app.inject({ method: 'POST', url: `/api/notas/${v.json().nota.id}/recebido`, headers: h, payload: { data: '2026-01-02' } });
+    assert.equal(rec.json().recebidoEm, '2026-01-02');
+    const futuro = await t.app.inject({ method: 'POST', url: `/api/notas/${v.json().nota.id}/recebido`, headers: h, payload: { data: '2099-01-01' } });
+    assert.equal(futuro.statusCode, 400);
+    assert.equal((await t.app.inject({ method: 'POST', url: `/api/notas/${v.json().nota.id}/desfazer-recebimento`, headers: h })).json().recebidoEm, null);
     const outro = await cadastrar(t.app);
     assert.equal((await t.app.inject({ method: 'DELETE', url: `/api/notas/${m.json().nota.id}`, headers: outro.h })).statusCode, 404);
     assert.equal((await t.app.inject({ method: 'DELETE', url: `/api/notas/${m.json().nota.id}`, headers: h })).statusCode, 204);

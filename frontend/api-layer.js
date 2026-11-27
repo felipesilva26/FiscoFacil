@@ -264,8 +264,8 @@ const SUB = {
       const outra = dir === 'recebida' ? n.emitente : n.destinatario;
       const imp = {}; Object.keys(n.impostos || {}).forEach(x => { if (n.impostos[x] != null) imp[x] = n.impostos[x]; });
       await api('POST', '/api/empresas/' + S.empresaId + '/notas', {documentoId:doc.id, tipo:n.tipo, chave:n.chave, numero:n.numero, serie:n.serie, dataEmissao:data, direcao:dir,
-        contraparteDoc:outra && outra.doc, contraparteNome:outra && outra.nome, valor:Math.round(valor * 100) / 100, impostos:imp});
-      await refresh(dir === 'emitida' ? 'Venda registrada no faturamento.' : 'Compra registrada.');
+        contraparteDoc:outra && outra.doc, contraparteNome:outra && outra.nome, valor:Math.round(valor * 100) / 100, impostos:imp, receberEm:(dir === 'emitida' && $('#nrec').value) || null});
+      await refresh(dir === 'emitida' ? ($('#nrec') && $('#nrec').value ? 'Venda registrada. Você será avisado do recebimento.' : 'Venda registrada no faturamento.') : 'Compra registrada.');
     } else {
       const v = $('#lval').value;
       if (!v) throw new Error('Informe até quando a certidão é válida.');
@@ -369,7 +369,9 @@ function drawLer(){
       avisos.replace('Já existe uma obrigação igual cadastrada.', 'Esta nota já foi registrada antes.') +
       field('ndir', 'Esta nota é', '<select id="ndir" class="in"><option value="emitida"' + (n.direcao !== 'recebida' ? ' selected' : '') + '>Uma venda (emitida pela empresa)</option><option value="recebida"' + (n.direcao === 'recebida' ? ' selected' : '') + '>Uma compra (recebida de fornecedor)</option></select>', n.direcao === 'outra' ? 'Não achei o CNPJ da empresa na nota. Escolha você.' : 'Vendas contam no faturamento.') +
       '<div class="formrow">' + field('ndata', 'Data de emissão', '<input id="ndata" type="date" class="in" value="' + esc(n.dataEmissao || '') + '">') +
-      field('nfvalor', 'Valor total (R$)', '<input id="nfvalor" class="in" inputmode="decimal" value="' + esc(num2br(n.valor)) + '">') + '</div>' + botoes(r.duplicada ? '' : 'Registrar nota e guardar');
+      field('nfvalor', 'Valor total (R$)', '<input id="nfvalor" class="in" inputmode="decimal" value="' + esc(num2br(n.valor)) + '">') + '</div>' +
+      field('nrec', 'Quando o cliente vai pagar (só para vendas)', '<input id="nrec" type="date" class="in" value="' + esc(n.receberEm || '') + '">', n.receberEm ? 'Peguei essa data na nota. Confira.' : 'Não achei a data de pagamento na nota. Se souber, informe: o sistema avisa quando chegar perto.') +
+      botoes(r.duplicada ? '' : 'Registrar nota e guardar');
   } else {
     title = 'Li uma certidão';
     const sit = {negativa:'Negativa (sem débitos)', positiva_com_efeitos_de_negativa:'Positiva com efeitos de negativa', positiva:'Positiva (há débitos)'}[L.situacaoCertidao] || '';
@@ -897,8 +899,12 @@ function painelAvisos(){
     if (atr.length > 1) cards.push(cartao('', 'CRÍTICO', 'REGULARIZAR', (atr.length - 1) + (atr.length === 2 ? ' outra guia atrasada' : ' outras guias atrasadas'), 'Somam ' + brl(atr.slice(1).reduce((a, x) => a + x.valor, 0)) + '. Veja pagamento à vista ou parcelamento.', 'Ver como regularizar', 'regularizar'));
   }
   abert.filter(o => o.venc >= ti && diffDays(o.venc, t) <= 7).forEach(o => { const d = diffDays(o.venc, t); cards.push(cartao('warn', 'ATENÇÃO', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', rotulo(o) + ' vence ' + fmtDate(o.venc), brl(o.valor) + '. Pague até o vencimento para evitar multa.', 'Pagar esta guia', 'abrir-pagamento', o.id)); });
+  const NN = NOTAS[S.empresaId], aRec = NN ? NN.notas.filter(n => n.direcao === 'emitida' && n.receberEm && !n.recebidoEm).sort((x, y) => x.receberEm < y.receberEm ? -1 : 1) : [];
+  const cli = n => n.contraparteNome || (n.contraparteDoc ? fmtDoc(n.contraparteDoc) : 'o cliente');
+  aRec.filter(n => n.receberEm < ti).slice(0, 2).forEach(n => cards.push(cartao('warn', 'CONFIRME', 'PREVISTO ' + fmtDate(n.receberEm), 'Você recebeu ' + brl(n.valor) + '?', 'De ' + cli(n) + (n.numero ? ', nota nº ' + n.numero : '') + '. Se já caiu na conta, marque como recebido.', 'Já recebi', 'recebi', n.id)));
+  aRec.filter(n => n.receberEm >= ti).slice(0, 2).forEach(n => { const d = diffDays(n.receberEm, t); cards.push(cartao('ok', 'A RECEBER', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', 'Dia ' + fmtDate(n.receberEm) + ' você vai receber ' + brl(n.valor), 'De ' + cli(n) + (n.numero ? ', nota nº ' + n.numero : '') + '.', 'Já recebi', 'recebi', n.id)); });
   const proxima = abert.find(o => o.venc >= ti && diffDays(o.venc, t) > 7);
-  if (proxima && cards.length < 4) cards.push(cartao('info', 'LEMBRETE', 'EM ' + diffDays(proxima.venc, t) + ' DIAS', rotulo(proxima) + ' vence ' + fmtDate(proxima.venc), brl(proxima.valor) + '. Ainda dá tempo.', 'Ver como pagar', 'abrir-pagamento', proxima.id));
+  if (proxima && cards.length < 5) cards.push(cartao('info', 'LEMBRETE', 'EM ' + diffDays(proxima.venc, t) + ' DIAS', rotulo(proxima) + ' vence ' + fmtDate(proxima.venc), brl(proxima.valor) + '. Ainda dá tempo.', 'Ver como pagar', 'abrir-pagamento', proxima.id));
   if (!st.L.length) cards.push('<div class="al info"><div class="t"><span>COMECE AQUI</span><span></span></div><b>Nenhuma guia registrada</b><span class="tx">Anexe o PDF da guia para o sistema acompanhar os vencimentos.</span></div>');
   const aviso = cards.length ? '<section class="card avisos" style="margin-top:20px"><div class="chead"><h2>Ações imediatas</h2></div><div class="alcards">' + cards.join('') + '</div></section>' : '';
 
@@ -920,9 +926,14 @@ function painelAvisos(){
     '<div class="leg"><span><i class="d ok"></i>Paga ' + nP + '</span><span><i class="d bad"></i>Atrasada ' + nA + '</span><span><i class="d warn"></i>A vencer ' + nV + '</span><span><i class="d vazio"></i>Sem guia</span></div><div class="barras">' + barras + '</div></section>';
 
   /* linha do tempo: hoje + próximos vencimentos cadastrados */
-  const futuras = st.L.filter(o => o.venc >= ti).sort((a, b) => a.venc < b.venc ? -1 : 1).slice(0, 4);
+  const itens = st.L.filter(o => o.venc >= ti).map(o => ({d:o.venc, o:o})).concat(aRec.filter(n => n.receberEm >= ti).map(n => ({d:n.receberEm, n:n}))).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 5);
+  const futuras = itens;
+  const quando = d => { const k = diffDays(d, t); return fmtDate(d) + ' · ' + (k === 0 ? 'hoje' : k === 1 ? 'amanhã' : 'em ' + k + ' dias'); };
   const pontos = ['<div class="pt ' + (atr.length ? 'bad' : 'ok') + '"><small>Hoje · ' + fmtDate(ti) + '</small><b>' + (atr.length ? atr.length + (atr.length === 1 ? ' guia atrasada' : ' guias atrasadas') : 'Nada atrasado') + '</b><span>' + (atr.length ? brl(atr.reduce((a, o) => a + o.valor, 0)) + ' em atraso' : 'Tudo em dia') + '</span></div>']
-    .concat(futuras.map(o => { const d = diffDays(o.venc, t); return '<button class="pt ' + (o.pagoEm ? 'ok' : d <= 7 ? 'warn' : '') + '" data-action="abrir-pagamento" data-id="' + o.id + '"><small>' + fmtDate(o.venc) + ' · ' + (d === 0 ? 'hoje' : d === 1 ? 'amanhã' : 'em ' + d + ' dias') + '</small><b>' + esc(rotulo(o)) + '</b><span>' + (o.pagoEm ? 'Já paga em ' + fmtDate(o.pagoEm) : brl(o.valor)) + '</span></button>'; }));
-  const linha = '<section class="card" style="margin-top:20px"><div class="chead"><h2>O que vem a seguir</h2></div>' + (futuras.length ? '' : '<p class="sub" style="margin:0 0 6px">Ainda não há guias futuras cadastradas. Anexe as próximas guias para elas aparecerem aqui.</p>') + '<div class="crono">' + pontos.join('') + '</div></section>';
+    .concat(itens.map(x => { if (x.n) return '<button class="pt rec" data-action="recebi" data-id="' + x.n.id + '" title="Clique para marcar como recebido"><small>' + quando(x.d) + '</small><b>Receber ' + brl(x.n.valor) + '</b><span>' + esc(cli(x.n)) + (x.n.numero ? ' · nota nº ' + esc(x.n.numero) : '') + '</span></button>';
+      const o = x.o, d = diffDays(o.venc, t); return '<button class="pt ' + (o.pagoEm ? 'ok' : d <= 7 ? 'warn' : '') + '" data-action="abrir-pagamento" data-id="' + o.id + '"><small>' + quando(o.venc) + '</small><b>' + esc(rotulo(o)) + '</b><span>' + (o.pagoEm ? 'Já paga em ' + fmtDate(o.pagoEm) : brl(o.valor)) + '</span></button>'; }));
+  const linha = '<section class="card" style="margin-top:20px"><div class="chead"><h2>O que vem a seguir</h2></div>' + (itens.length ? '' : '<p class="sub" style="margin:0 0 6px">Ainda não há guias nem recebimentos futuros cadastrados. Anexe as próximas guias e as notas de venda para elas aparecerem aqui.</p>') + '<div class="crono">' + pontos.join('') + '</div></section>';
   return aviso + grafico + linha;
 }
+
+ACT.recebi = rodar(async el => { await api('POST', '/api/notas/' + el.dataset.id + '/recebido'); await refresh('Recebimento registrado.'); });

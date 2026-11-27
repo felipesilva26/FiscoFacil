@@ -146,6 +146,8 @@ alter table users add column if not exists ultimo_acesso timestamptz not null de
 alter table users add column if not exists aceite_privacidade timestamptz;
 alter table documentos add column if not exists conteudo bytea;
 update users set anonimo = true where anonimo = false and email like 'visitante-%@fiscofacil.app';
+alter table notas_fiscais add column if not exists receber_em text;
+alter table notas_fiscais add column if not exists recebido_em text;
 create index if not exists notas_empresa_data on notas_fiscais (empresa_id, data_emissao);
 create index if not exists auditoria_criado on auditoria (criado_em);
 create unique index if not exists notas_chave_unica on notas_fiscais (empresa_id, chave) where chave is not null;

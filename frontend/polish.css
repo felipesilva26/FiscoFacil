@@ -339,3 +339,5 @@ button.pt{cursor:pointer}button.pt:hover b{text-decoration:underline}
 .pt.bad:before{background:var(--bad)}.pt.warn:before{background:#E0A100}.pt.ok:before{background:var(--ok)}
 .pt small{display:block;color:var(--blue);font-weight:700}.pt.bad small{color:var(--bad)}.pt.warn small{color:#9A6B00}.pt.ok small{color:var(--ok)}.pt b{display:block}.pt span{color:var(--ink-2);font-size:13px}
 @container app (max-width:560px){.bcol .bv{display:none}.barras{height:170px}}
+.al.ok{border-color:#C9EBD5;border-left-color:var(--ok);background:#F1FBF4}.al.ok .t{color:var(--ok)}
+.pt.rec:before{background:var(--ok)}.pt.rec small{color:var(--ok)}
