@@ -81,3 +81,9 @@ describe('leitura de PDF pela API', () => {
     assert.equal((await t.app.inject({ method: 'POST', url: `/api/empresas/${e.id}/documentos/ler`, headers: { ...b.h, ...ok.headers }, payload: ok.payload })).statusCode, 404);
   });
 });
+
+test('guia com carimbo "PAGO DIA" vem com a data do pagamento', () => {
+  const t = 'Documento de Arrecadação do Simples Nacional\nCNPJ 16.749.358/0001-51\nPeríodo de Apuração outubro/2026\nData de Vencimento 23/11/2026\nPAGO DIA 16/11/2026\nValor Total do Documento 3.404,93';
+  const l = lerDocumento(t, '16749358000151');
+  assert.equal(l.tipo, 'guia'); assert.equal(l.valor, 3404.93); assert.equal(l.vencimento, '2026-11-23'); assert.equal(l.dataPagamento, '2026-11-16');
+});

@@ -104,6 +104,9 @@ export function lerDocumento(textoBruto: string, cnpjEmpresa?: string | null): L
     r.confianca = r.dataPagamento && r.valor ? 'alta' : r.dataPagamento || r.valor ? 'media' : 'baixa';
   } else if (tributo && (r.vencimento || linha)) {
     r.tipo = 'guia';
+    // A Receita carimba "PAGO DIA dd/mm/aaaa" na guia depois que o pagamento é identificado.
+    const pg = t.match(/pago\s+(?:dia|em)\s+(\d{2}\/\d{2}\/\d{4})/i);
+    if (pg) r.dataPagamento = toISO(pg[1]);
     r.confianca = r.vencimento && r.valor && r.valor > 0 ? 'alta' : 'media';
     if (!r.vencimento) avisos.push('Não encontrei o vencimento. Informe manualmente.');
     if (!r.valor) avisos.push('Não encontrei o valor. Informe manualmente.');

@@ -224,9 +224,11 @@ const SUB = {
       const venc = $('#lvenc').value, valor = parseMoney($('#lvalor').value);
       if (!venc) throw new Error('Informe a data de vencimento.');
       if (!(valor > 0)) throw new Error('Informe um valor maior que zero.');
-      await api('POST', '/api/empresas/' + S.empresaId + '/obrigacoes', {tributo:$('#ltrib').value, venc:venc, valor:Math.round(valor * 100) / 100, codigo:$('#lcod').value.trim()});
+      const criada = await api('POST', '/api/empresas/' + S.empresaId + '/obrigacoes', {tributo:$('#ltrib').value, venc:venc, valor:Math.round(valor * 100) / 100, codigo:$('#lcod').value.trim()});
+      const jaPaga = $('#lpaga') && $('#lpaga').checked ? ($('#lpagodata').value || '') : '';
+      if (jaPaga) await api('POST', '/api/obrigacoes/' + criada.id + '/pagar', {data:jaPaga, comprovante:lerFile.name});
       await enviar(S.empresaId, lerFile, 'Guia');
-      await refresh('Obrigação criada e arquivo guardado.');
+      await refresh(jaPaga ? 'Guia criada e marcada como paga.' : 'Obrigação criada e arquivo guardado.');
     } else if (k === 'comprovante') {
       const sel = f.querySelector('input[name="lcand"]:checked');
       if (!sel) throw new Error('Escolha a obrigação paga.');
@@ -328,7 +330,9 @@ function drawLer(){
       '<div class="formrow">' + field('ltrib', 'Tributo', '<select id="ltrib" class="in">' + Object.keys(TRIB).map(k => '<option value="' + k + '"' + (L.tributo === k ? ' selected' : '') + '>' + esc(TRIB[k]) + '</option>').join('') + '</select>') +
       field('lvenc', 'Vencimento', '<input id="lvenc" type="date" class="in" value="' + esc(L.vencimento || '') + '">') + '</div>' +
       field('lvalor', 'Valor (R$)', '<input id="lvalor" class="in" inputmode="decimal" value="' + esc(num2br(L.valor)) + '">') +
-      field('lcod', 'Linha digitável (opcional)', '<input id="lcod" class="in" autocomplete="off" value="' + esc(L.linhaDigitavel || '') + '">') + botoes(r.duplicada ? '' : 'Criar obrigação e guardar');
+      field('lcod', 'Linha digitável (opcional)', '<input id="lcod" class="in" autocomplete="off" value="' + esc(L.linhaDigitavel || '') + '">') +
+      (L.dataPagamento ? '<label class="chk" style="display:flex;gap:10px;align-items:center;margin-top:6px"><input type="checkbox" id="lpaga" checked> <span>Esta guia já está <b>paga</b> (carimbo da Receita). Data:</span> <input id="lpagodata" type="date" class="in" style="max-width:170px" value="' + esc(L.dataPagamento) + '"></label>' : '') +
+      botoes(r.duplicada ? '' : 'Criar obrigação e guardar');
   } else if (L.tipo === 'comprovante') {
     title = 'Li um comprovante';
     const c = r.candidatos;

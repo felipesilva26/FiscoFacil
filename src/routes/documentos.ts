@@ -82,6 +82,16 @@ export async function documentosRoutes(app: FastifyInstance, ctx: Ctx) {
     try {
       const pdf = await getDocumentProxy(new Uint8Array(buf));
       texto = (await extractText(pdf, { mergePages: true })).text;
+      // Carimbos como "PAGO DIA 16/11/2026" vêm como anotação do PDF, não como texto da página.
+      for (let n = 1; n <= Math.min(pdf.numPages, 5); n++) {
+        try {
+          const anot = await (await pdf.getPage(n)).getAnnotations();
+          for (const x of anot as { subtype?: string; contentsObj?: { str?: string }; contents?: string }[]) {
+            const c = x.contentsObj?.str ?? x.contents;
+            if (c && (x.subtype === 'FreeText' || x.subtype === 'Stamp' || x.subtype === 'Text')) texto += `\n${String(c).slice(0, 200)}`;
+          }
+        } catch { /* sem anotações legíveis: segue só com o texto */ }
+      }
     } catch {
       return reply.code(422).send({ erro: 'Não consegui abrir este PDF.' });
     }
