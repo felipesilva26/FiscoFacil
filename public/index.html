@@ -637,6 +637,14 @@ h1{letter-spacing:-.018em}
 }
 .meitbl .mmes b{text-transform:capitalize}
 
+/* Início enxuto */
+.comece{border:1px dashed var(--line);background:var(--blue-soft)}
+.maisinfo>summary{cursor:pointer;padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:#fff;font-weight:600;color:var(--ink-2);list-style:none}
+.maisinfo>summary::-webkit-details-marker{display:none}
+.maisinfo>summary::before{content:'+';display:inline-block;width:1.4em;font-weight:700;color:var(--brand,#5B3FE0)}
+.maisinfo[open]>summary::before{content:'\2212'}
+.anexarlinha{align-items:center;gap:12px;flex-wrap:wrap}
+
 </style>
 
 <div class="frame" id="frame">
@@ -1631,7 +1639,7 @@ function drawLer(){
     body = '<form id="formLer" class="form" data-k="certidao"><p class="sub" style="margin:0">Arquivo <b>' + esc(lerFile.name) + '</b>. Situação: <b>' + esc(sit) + '</b>.</p>' + avisos +
       field('lval', 'Válida até', '<input id="lval" type="date" class="in" value="' + esc(L.validade || '') + '">', 'Você será avisado antes de vencer.') + botoes('Guardar certidão');
   }
-  box.innerHTML = '<div class="overlay" data-overlay><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mt" tabindex="-1"><div class="mhead"><h2 id="mt">' + title + '</h2>' + close + '</div>' + body + '</div></div>';
+  box.innerHTML = '<div class="overlay" data-overlay><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mt" tabindex="-1"><div class="mhead"><h2 id="mt">' + title + (m.pos ? ' <small style="font-weight:500;color:var(--mute)">(' + m.pos + ')</small>' : '') + '</h2>' + close + '</div>' + body + '</div></div>';
 }
 ACT['ler-so-arquivo'] = rodar(async () => {
   const L = ui.modal.r.leitura;
@@ -1847,7 +1855,8 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="baixar-planilha">Baixar planilha</button> <button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + passos + '</div><div class="stack">' + dados + vigia + atalhos + linha + '</div></div>' + limites;
+    veredito + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + '</div><div class="stack">' + dados + '</div></div>' +
+    '<details class="maisinfo" style="margin-top:20px"><summary>Mais informações: vigilância, histórico, atalhos e como autorizar a Receita</summary><div class="stack" style="margin-top:16px">' + vigia + linha + atalhos + passos + '</div></details>' + limites;
 }
 
 
@@ -1872,16 +1881,55 @@ function confirmarMei(s){
     '<p class="hint" style="margin:4px 0 0">Pela tabela oficial somam ' + reais(m.valor) + '. Marque "Paguei" ou "Não paguei" em cada mês e este painel passa a mostrar o que está pago e o que está em aberto.</p></div>' +
     '<button class="btn primary" data-action="ir-mei">Confirmar agora</button></section>';
 }
+function botaoAnexar(cls){ return '<label class="btn ' + (cls || 'primary') + '" for="fileGuias" style="cursor:pointer">' + ic('plus', 18) + 'Anexar guia (PDF)</label>'; }
 function numerosInicio(s){
   const st = stats(), mesNome = MESES[today().getMonth()].toLowerCase(), m = meiPendentes(s);
+  const entrada = '<input type="file" id="fileGuias" class="sr" accept=".pdf" multiple>';
+  if (!st.L.length && !m.tem) {
+    return '<section class="card comece" style="margin-top:20px">' + entrada +
+      '<h2 style="margin:0 0 6px">Ainda não há guias registradas</h2>' +
+      '<p class="sub" style="margin:0 0 14px;max-width:70ch">Por isso o que está <b>em aberto</b>, o que <b>vence em 7 dias</b> e o que foi <b>pago</b> aparecem vazios. O FiscoFácil não vê as guias na Receita sozinho (isso depende da conexão com o Serpro, ainda não ativa). Mas ele <b>lê o PDF da guia</b>: anexe o DAS e o valor, o vencimento e o código entram em segundos.</p>' +
+      '<div class="actions" style="justify-content:flex-start;flex-wrap:wrap">' + botaoAnexar('primary') + '<button class="btn ghost" data-action="nova">' + ic('plus', 18) + 'Cadastrar guia manualmente</button></div>' +
+      '<p class="hint" style="margin:12px 0 0">Dica: pode anexar vários PDFs de uma vez, inclusive comprovantes de pagamento: o sistema marca a guia como paga. Depois da conexão com a Receita, isso passa a ser automático.</p></section>';
+  }
   const kp = (icone, tom, rot, sub, val, vt) => '<div class="card kpi"><span class="kicon ' + tom + '">' + icone + '</span><div><div class="klabel">' + rot + '</div><div class="ksub">' + sub + '</div><div class="kval' + (vt ? ' ' + vt : '') + '">' + val + '</div></div></div>';
+  const pagoMei = m.tem ? Math.max(m.pagos, st.pagosMes) : 0;
   return '<div class="kpis kpis3" style="margin-top:20px">' +
-    kp(ic('alert', 24), 'bad', 'Em aberto', m.n ? 'guias em aberto + ' + reais(m.valor) + ' a confirmar' : 'guias em aberto', brl(st.totalPend), st.totalPend ? 'bad' : '') +
-    kp(ic('calendar', 24), 'brand', 'Vencem em 7 dias', st.prox7.length === 1 ? 'guia' : 'guias', st.prox7.length) +
+    kp(ic('alert', 24), 'bad', 'Em aberto', st.abertas.length ? st.abertas.length + (st.abertas.length === 1 ? ' guia' : ' guias') + (m.n ? ' + ' + reais(m.valor) + ' a confirmar' : '') : (m.n ? 'mais ' + reais(m.valor) + ' do DAS-MEI a confirmar' : 'nenhuma guia pendente'), brl(st.totalPend), st.totalPend ? 'bad' : '') +
+    kp(ic('calendar', 24), 'brand', 'Vencem em 7 dias', st.prox7.length ? (st.prox7.length === 1 ? 'guia' : 'guias') : 'nada vence nesta semana', st.prox7.length) +
     (m.tem
-      ? kp(ic('check', 24), 'ok', 'Pago', 'DAS-MEI confirmados (últimos meses)', brl(Math.max(m.pagos, st.pagosMes)), 'ok')
-      : kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, 'pagamentos registrados', brl(st.pagosMes), 'ok')) + '</div>';
+      ? kp(ic('check', 24), 'ok', 'Pago', pagoMei ? 'DAS-MEI confirmados (últimos meses)' : 'confirme os meses do DAS-MEI abaixo', brl(pagoMei), 'ok')
+      : kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, st.pagosMes ? 'pagamentos registrados' : 'nenhum pagamento registrado neste mês', brl(st.pagosMes), 'ok')) + '</div>' +
+    '<div class="actions anexarlinha" style="justify-content:flex-start;margin-top:12px">' + entrada + botaoAnexar('soft sm') + '<span class="hint">Anexe o PDF da guia ou do comprovante: o sistema lê e você só confere.</span></div>';
 }
+/* Anexar vários PDFs de uma vez, direto no Início: lê todos e pede a conferência um a um. */
+let lerFila = [], lerTotal = 0;
+async function lancarGuias(files){
+  const arr = Array.prototype.slice.call(files).filter(f => /\.pdf$/i.test(f.name));
+  if (!arr.length) { toast('Escolha arquivos PDF.'); return; }
+  const fila = [], falhas = [];
+  toast('Lendo ' + arr.length + (arr.length === 1 ? ' arquivo...' : ' arquivos...'));
+  for (const f of arr) {
+    try {
+      const fd = new FormData(); fd.append('file', f, f.name);
+      const r = await api('POST', '/api/empresas/' + S.empresaId + '/documentos/ler', fd, true);
+      if (r.leitura.tipo === 'desconhecido') falhas.push(f.name); else fila.push({file:f, r:r});
+    } catch (er) { falhas.push(f.name); }
+  }
+  if (falhas.length) toast((falhas.length === 1 ? 'Não consegui ler: ' : 'Não consegui ler ' + falhas.length + ' arquivos: ') + falhas.slice(0, 2).join(', ') + '. Cadastre à mão ou guarde em Documentos.');
+  lerFila = fila; lerTotal = fila.length;
+  proximaLeitura();
+}
+function proximaLeitura(){
+  const it = lerFila.shift();
+  if (!it) return;
+  lerFile = it.file; ui.modal = {t:'lerdoc', r:it.r, pos:lerTotal > 1 ? (lerTotal - lerFila.length) + ' de ' + lerTotal : ''}; renderModal();
+}
+const _refreshFila = refresh;
+refresh = async function(msg){ await _refreshFila(msg); if (lerFila.length) proximaLeitura(); };
+const _fecharFila = ACT.fechar;
+ACT.fechar = function(){ const era = ui.modal && ui.modal.t === 'lerdoc'; _fecharFila.apply(this, arguments); if (era && lerFila.length) proximaLeitura(); };
+document.addEventListener('change', e => { if (e.target.id === 'fileGuias') { const f = e.target.files; lancarGuias(f); e.target.value = ''; } });
 /* Guias e calendário na mesma tela, com um seletor. */
 ui.gv = ui.gv || 'lista';
 const _pgGuias = pgGuias;
@@ -1948,7 +1996,7 @@ renderMain = function(){
     const inp = $('#fileDoc'); if (inp) inp.setAttribute('accept', '.pdf,.xml,.png,.jpg,.jpeg,.csv,.txt,.xlsx');
   }
   if (ui.page === 'inicio') {
-    const k = $('#main .kpis3');
+    const k = $('#main .anexarlinha') || $('#main .kpis3');
     if (k) k.insertAdjacentHTML('afterend', secaoDinheiro());
   }
 };

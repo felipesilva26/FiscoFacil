@@ -298,3 +298,11 @@ h1{letter-spacing:-.018em}
   .meitbl .mmes{grid-area:m}.meitbl .mval{grid-area:v;font-size:16px}.meitbl li>.chip{grid-area:s;justify-self:start}.meitbl .mbtn{grid-area:b;justify-content:flex-start}
 }
 .meitbl .mmes b{text-transform:capitalize}
+
+/* Início enxuto */
+.comece{border:1px dashed var(--line);background:var(--blue-soft)}
+.maisinfo>summary{cursor:pointer;padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:#fff;font-weight:600;color:var(--ink-2);list-style:none}
+.maisinfo>summary::-webkit-details-marker{display:none}
+.maisinfo>summary::before{content:'+';display:inline-block;width:1.4em;font-weight:700;color:var(--brand,#5B3FE0)}
+.maisinfo[open]>summary::before{content:'\2212'}
+.anexarlinha{align-items:center;gap:12px;flex-wrap:wrap}
