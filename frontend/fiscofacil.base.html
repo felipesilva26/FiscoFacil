@@ -819,6 +819,32 @@ function renderModal(){
       '<div class="field"><label for="dcod">Linha digitável ou código de barras</label><div class="sendrow"><input id="dcod" class="in" data-id="' + o.id + '" value="' + esc(o.codigo) + '" placeholder="Cole aqui o código da guia"><button class="btn ghost" data-action="copiar" data-id="' + o.id + '" aria-label="Copiar código">' + ic('copy', 18) + '</button></div></div>' +
       (ui.confirm === o.id ? '<p class="err">Excluir esta obrigação? Não dá para desfazer.</p><div class="actions"><button class="btn ghost" data-action="fechar">Cancelar</button><button class="btn danger" data-action="excluir-ok" data-id="' + o.id + '">Excluir</button></div>'
       : '<div class="actions">' + (o.pagoEm ? '<button class="btn ghost" data-action="desfazer" data-id="' + o.id + '">Desfazer pagamento</button>' : '<button class="btn primary" data-action="pagar" data-id="' + o.id + '">Marcar como pago</button>') + '<button class="btn ghost" data-action="arquivar" data-id="' + o.id + '">' + (o.arquivado ? 'Desarquivar' : 'Arquivar') + '</button><button class="btn danger" data-action="excluir" data-id="' + o.id + '">Excluir</button></div>');
+  } else if (m.t === 'pagarguia') {
+    const o = S.obrigacoes.find(x => x.id === m.id); if (!o) { ui.modal = null; box.innerHTML = ''; return; }
+    const em = S.empresas.find(x => x.id === o.empresaId) || {}, st = status(o), cj = fmtCnpj(em.cnpj || '');
+    const site = o.tributo === 'DAS' ? {u:'https://www8.receita.fazenda.gov.br/simplesnacional/', t:'Abrir o Simples Nacional (Receita)'} : {u:'https://cav.receita.fazenda.gov.br/', t:'Abrir o e-CAC (Receita)'};
+    title = 'Pagar ' + esc(o.tributo) + ' ' + comp(o.venc);
+    const cab = '<dl class="kv"><dt>Situação</dt><dd>' + chip(st) + '</dd><dt>Valor cadastrado</dt><dd class="num">' + brl(o.valor) + '</dd><dt>Vencimento</dt><dd>' + fmtDate(o.venc) + ' (' + rel(o.venc) + ')</dd></dl>';
+    if (o.pagoEm) {
+      body = cab + '<p class="sub">Esta guia já está registrada como paga em ' + fmtDate(o.pagoEm) + '.</p><div class="actions"><button class="btn ghost" data-action="detalhe" data-id="' + o.id + '">Ver detalhes</button></div>';
+    } else {
+      body = cab +
+        '<ol class="steps"><li class="step"><span class="sn">1</span><div><b>Emita a guia' + (st === 'atrasado' ? ' atualizada' : '') + ' no site da Receita</b><p class="hint">' + (st === 'atrasado' ? 'Guia vencida precisa ser emitida de novo: a Receita calcula a multa e os juros. ' : '') + 'O site pede o CNPJ e o mês (' + comp(o.venc) + '). Use sempre um endereço terminado em .gov.br.</p>' +
+        '<div class="actions" style="justify-content:flex-start;margin-top:8px"><a class="btn primary" href="' + site.u + '" target="_blank" rel="noopener">' + site.t + '</a><button class="btn ghost" data-action="copiar-cnpj" data-cnpj="' + esc(cj) + '">' + ic('copy', 16) + 'Copiar CNPJ</button></div></div></li>' +
+        '<li class="step"><span class="sn">2</span><div><b>Pague no app do seu banco</b><p class="hint">Copie o código de barras da guia emitida e cole no app do banco (ou pague pelo Pix, se a guia tiver QR Code). Guarde o comprovante.</p>' +
+        '<div class="field"><label for="dcod">Código de barras (opcional, fica guardado aqui)</label><div class="sendrow"><input id="dcod" class="in" data-id="' + o.id + '" value="' + esc(o.codigo) + '" placeholder="Cole aqui o código da guia"><button class="btn ghost" data-action="copiar" data-id="' + o.id + '" aria-label="Copiar código">' + ic('copy', 18) + '</button></div></div></div></li>' +
+        '<li class="step"><span class="sn">3</span><div><b>Volte e registre o pagamento</b><p class="hint">Ou anexe o comprovante em PDF na tela Início: o sistema lê e marca como paga.</p><div class="actions" style="justify-content:flex-start;margin-top:8px"><button class="btn primary" data-action="pagar" data-id="' + o.id + '">Já paguei: marcar como paga</button></div></div></li></ol>' +
+        '<p class="hint">O FiscoFácil não faz o pagamento: ele leva você ao lugar certo. O pagamento é feito no site da Receita e no seu banco.</p>';
+    }
+  } else if (m.t === 'regularizar') {
+    const L = stats(), tot = L.atrasadas.reduce((a, o) => a + o.valor, 0);
+    title = 'Como regularizar as guias atrasadas';
+    body = '<p class="sub" style="margin:0 0 10px"><b>' + L.atrasadas.length + (L.atrasadas.length === 1 ? ' guia atrasada' : ' guias atrasadas') + '</b>, somando <b>' + brl(tot) + '</b> (sem multa e juros novos).</p>' +
+      '<ol class="steps"><li class="step"><span class="sn">1</span><div><b>Pagar à vista</b><p class="hint">Costuma sair mais barato no total. Emita cada guia atualizada no site do Simples Nacional e pague no banco.</p></div></li>' +
+      '<li class="step"><span class="sn">2</span><div><b>Parcelar</b><p class="hint">Débitos do Simples Nacional podem ser parcelados, em geral em até 60 parcelas, pelo e-CAC da Receita. Confira as condições atuais no site antes de decidir.</p></div></li>' +
+      '<li class="step"><span class="sn">3</span><div><b>Falar com o contador</b><p class="hint">Vale muito a pena se os valores forem altos, se houver dúvida sobre qual guia emitir ou se a empresa corre risco de ser excluída do Simples.</p></div></li></ol>' +
+      '<div class="actions" style="justify-content:flex-start"><a class="btn primary" href="https://www8.receita.fazenda.gov.br/simplesnacional/" target="_blank" rel="noopener">Abrir o Simples Nacional</a><a class="btn ghost" href="https://cav.receita.fazenda.gov.br/" target="_blank" rel="noopener">Abrir o e-CAC (parcelamento)</a></div>' +
+      '<p class="hint">Este texto é um guia geral, não é orientação contábil. Os valores atualizados e as regras de parcelamento só a Receita informa.</p>';
   } else if (m.t === 'novaemp') {
     title = 'Adicionar empresa';
     body = '<form id="formNovaEmp" class="form">' + field('mnome', 'Nome da empresa', '<input id="mnome" class="in" autocomplete="off" autofocus>') +
@@ -856,6 +882,8 @@ const ACT = {
   nova(el){ ui.modal = {t:'nova', venc:el.dataset.venc || ''}; renderModal(); },
   debitos(){ ui.modal = {t:'debitos'}; renderModal(); },
   fechar(){ const c = ui.confirm; closeModal(); if (c === 'restaurar') renderMain(); },
+  'abrir-pagamento'(el){ ui.alerts = false; renderTop(); ui.confirm = null; ui.modal = {t:'pagarguia', id:el.dataset.id}; renderModal(); },
+  regularizar(){ ui.alerts = false; renderTop(); ui.modal = {t:'regularizar'}; renderModal(); },
   detalhe(el){ ui.alerts = false; renderTop(); ui.confirm = null; ui.modal = {t:'detalhe', id:el.dataset.id}; renderModal(); },
   pagar(el){ ui.modal = {t:'pagar', id:el.dataset.id}; renderModal(); },
   desfazer(el){ const o = find(el.dataset.id); if (o) { o.pagoEm = null; o.comprovante = ''; } closeModal(); commit(); toast('Pagamento desfeito.'); },

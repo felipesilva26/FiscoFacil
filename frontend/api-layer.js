@@ -592,7 +592,7 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="baixar-planilha">Baixar planilha</button> <button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    saudeFiscal(s, veredito) + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + '</div><div class="stack">' + dados + '</div></div>' +
+    saudeFiscal(s, veredito) + painelAvisos() + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + '</div><div class="stack">' + dados + '</div></div>' +
     '<details class="maisinfo" style="margin-top:20px"><summary>Mais informações: vigilância, histórico, atalhos e como autorizar a Receita</summary><div class="stack" style="margin-top:16px">' + vigia + linha + atalhos + passos + '</div></details>' + limites;
 }
 
@@ -882,3 +882,47 @@ let mascaraTimer = 0;
 new MutationObserver(() => { if (!valoresOcultos) return; clearTimeout(mascaraTimer); mascaraTimer = setTimeout(() => mascarar(), 30); })
   .observe(document.body, {childList:true, subtree:true, characterData:true});
 if (valoresOcultos) { mascarar(); renderTop(); }
+
+/* ---------- Ações imediatas, gráfico dos 12 meses e próximos vencimentos ---------- */
+function painelAvisos(){
+  const st = stats(), t = today(), ti = iso(t), ano = t.getFullYear();
+  const rotulo = o => o.tributo + ' ' + comp(o.venc);
+  const abert = st.abertas.slice().sort((a, b) => a.venc < b.venc ? -1 : 1);
+  const atr = abert.filter(o => o.venc < ti);
+  const cards = [];
+  const cartao = (cls, rot, quando, titulo, texto, btn, acao, id) => '<div class="al ' + cls + '"><div class="t"><span>' + rot + '</span><span>' + quando + '</span></div><b>' + esc(titulo) + '</b><span class="tx">' + esc(texto) + '</span><button class="btn soft sm" data-action="' + acao + '"' + (id ? ' data-id="' + id + '"' : '') + '>' + esc(btn) + '</button></div>';
+  if (atr.length) {
+    const o = atr[0], dias = -diffDays(o.venc, t);
+    cards.push(cartao('', 'CRÍTICO', dias + (dias === 1 ? ' DIA' : ' DIAS') + ' DE ATRASO', rotulo(o) + ' atrasado', brl(o.valor) + '. Venceu em ' + fmtDate(o.venc) + '. A Receita soma multa e juros.', 'Pagar esta guia', 'abrir-pagamento', o.id));
+    if (atr.length > 1) cards.push(cartao('', 'CRÍTICO', 'REGULARIZAR', (atr.length - 1) + (atr.length === 2 ? ' outra guia atrasada' : ' outras guias atrasadas'), 'Somam ' + brl(atr.slice(1).reduce((a, x) => a + x.valor, 0)) + '. Veja pagamento à vista ou parcelamento.', 'Ver como regularizar', 'regularizar'));
+  }
+  abert.filter(o => o.venc >= ti && diffDays(o.venc, t) <= 7).forEach(o => { const d = diffDays(o.venc, t); cards.push(cartao('warn', 'ATENÇÃO', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', rotulo(o) + ' vence ' + fmtDate(o.venc), brl(o.valor) + '. Pague até o vencimento para evitar multa.', 'Pagar esta guia', 'abrir-pagamento', o.id)); });
+  const proxima = abert.find(o => o.venc >= ti && diffDays(o.venc, t) > 7);
+  if (proxima && cards.length < 4) cards.push(cartao('info', 'LEMBRETE', 'EM ' + diffDays(proxima.venc, t) + ' DIAS', rotulo(proxima) + ' vence ' + fmtDate(proxima.venc), brl(proxima.valor) + '. Ainda dá tempo.', 'Ver como pagar', 'abrir-pagamento', proxima.id));
+  if (!st.L.length) cards.push('<div class="al info"><div class="t"><span>COMECE AQUI</span><span></span></div><b>Nenhuma guia registrada</b><span class="tx">Anexe o PDF da guia para o sistema acompanhar os vencimentos.</span></div>');
+  const aviso = cards.length ? '<section class="card avisos" style="margin-top:20px"><div class="chead"><h2>Ações imediatas</h2></div><div class="alcards">' + cards.join('') + '</div></section>' : '';
+
+  /* gráfico: uma barra por mês de competência do ano */
+  const MES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const meses = MES.map((n, i) => ({n:n, i:i, g:[]}));
+  st.L.forEach(o => { const c = comp(o.venc), mm = Number(c.slice(0, 2)) - 1, yy = Number(c.slice(3)); if (yy === ano && meses[mm]) meses[mm].g.push(o); });
+  let nP = 0, nA = 0, nV = 0, maxV = 1;
+  meses.forEach(m => { m.v = m.g.reduce((a, o) => a + o.valor, 0); maxV = Math.max(maxV, m.v);
+    m.cls = !m.g.length ? 'vazio' : m.g.some(o => !o.pagoEm && o.venc < ti) ? 'bad' : m.g.some(o => !o.pagoEm) ? 'warn' : 'ok';
+    if (m.cls === 'bad') nA += m.g.filter(o => !o.pagoEm && o.venc < ti).length; else if (m.cls === 'warn') nV += m.g.filter(o => !o.pagoEm).length; if (m.cls === 'ok') nP += m.g.length; });
+  const mesAtual = t.getMonth();
+  const barras = meses.map(m => { const h = m.v ? Math.max(8, Math.sqrt(m.v / maxV) * 140) : 6, alvo = m.g.find(o => !o.pagoEm) || m.g[0];
+    const txt = m.v ? brl(m.v) : 'sem guia';
+    const tit = MES[m.i] + ': ' + (m.v ? m.g.length + (m.g.length === 1 ? ' guia' : ' guias') + ', ' + brl(m.v) : 'nenhuma guia cadastrada');
+    const inner = '<span class="bv">' + txt + '</span><i class="bar ' + m.cls + (m.i === mesAtual ? ' hoje' : '') + '" style="height:' + h + 'px"></i><em>' + m.n + '</em>';
+    return alvo ? '<button class="bcol" data-action="abrir-pagamento" data-id="' + alvo.id + '" title="' + esc(tit) + '" aria-label="' + esc(tit) + '">' + inner + '</button>' : '<div class="bcol" title="' + esc(tit) + '">' + inner + '</div>'; }).join('');
+  const grafico = '<section class="card" style="margin-top:20px"><div class="chead"><h2>Guias de ' + ano + ', mês a mês</h2></div><p class="sub" style="margin:0">Cada barra é um mês de competência. Clique em uma barra para ver como pagar.</p>' +
+    '<div class="leg"><span><i class="d ok"></i>Paga ' + nP + '</span><span><i class="d bad"></i>Atrasada ' + nA + '</span><span><i class="d warn"></i>A vencer ' + nV + '</span><span><i class="d vazio"></i>Sem guia</span></div><div class="barras">' + barras + '</div></section>';
+
+  /* linha do tempo: hoje + próximos vencimentos cadastrados */
+  const futuras = st.L.filter(o => o.venc >= ti).sort((a, b) => a.venc < b.venc ? -1 : 1).slice(0, 4);
+  const pontos = ['<div class="pt ' + (atr.length ? 'bad' : 'ok') + '"><small>Hoje · ' + fmtDate(ti) + '</small><b>' + (atr.length ? atr.length + (atr.length === 1 ? ' guia atrasada' : ' guias atrasadas') : 'Nada atrasado') + '</b><span>' + (atr.length ? brl(atr.reduce((a, o) => a + o.valor, 0)) + ' em atraso' : 'Tudo em dia') + '</span></div>']
+    .concat(futuras.map(o => { const d = diffDays(o.venc, t); return '<button class="pt ' + (o.pagoEm ? 'ok' : d <= 7 ? 'warn' : '') + '" data-action="abrir-pagamento" data-id="' + o.id + '"><small>' + fmtDate(o.venc) + ' · ' + (d === 0 ? 'hoje' : d === 1 ? 'amanhã' : 'em ' + d + ' dias') + '</small><b>' + esc(rotulo(o)) + '</b><span>' + (o.pagoEm ? 'Já paga em ' + fmtDate(o.pagoEm) : brl(o.valor)) + '</span></button>'; }));
+  const linha = '<section class="card" style="margin-top:20px"><div class="chead"><h2>O que vem a seguir</h2></div>' + (futuras.length ? '' : '<p class="sub" style="margin:0 0 6px">Ainda não há guias futuras cadastradas. Anexe as próximas guias para elas aparecerem aqui.</p>') + '<div class="crono">' + pontos.join('') + '</div></section>';
+  return aviso + grafico + linha;
+}
