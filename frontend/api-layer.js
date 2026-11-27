@@ -844,3 +844,41 @@ function saudeFiscal(s, veredito){
     '<p class="hint" style="margin:10px 0 0">Regra: Irregular se há guia atrasada ou pendência oficial; Atenção se há guia vencendo em até 7 dias; Regular nos demais casos.</p>' +
     (sitErro ? '<p class="err">' + esc(sitErro) + '</p>' : '') + '</section>';
 }
+
+/* ---------- Ocultar valores (privacidade): troca "R$ 1.234,56" por "R$ ••••" na tela ---------- */
+let valoresOcultos = false;
+try { valoresOcultos = localStorage.getItem('ff-ocultar') === '1'; } catch (e) {}
+const RE_REAIS = /R\$\s*-?\d[\d.]*(?:,\d{1,2})?/g, MASK = 'R$ ••••', orig = new Map();
+function mascarar(raiz){
+  if (!valoresOcultos) return;
+  const w = document.createTreeWalker(raiz || document.body, NodeFilter.SHOW_TEXT);
+  let n; const lote = [];
+  while ((n = w.nextNode())) { const p = n.parentNode && n.parentNode.nodeName; if (p !== 'SCRIPT' && p !== 'STYLE' && RE_REAIS.test(n.nodeValue)) lote.push(n); RE_REAIS.lastIndex = 0; }
+  lote.forEach(t => { orig.set(t, t.nodeValue); t.nodeValue = t.nodeValue.replace(RE_REAIS, MASK); });
+}
+function revelar(){ orig.forEach((v, t) => { if (t.isConnected) t.nodeValue = v; }); orig.clear(); }
+const IC_OLHO = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const IC_OLHO_X = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 4.1-5M9.9 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-2.2 3.2M1 1l22 22"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+const _renderTopOcultar = renderTop;
+renderTop = function(){
+  _renderTopOcultar.apply(this, arguments);
+  const t = $('#top .tools'); if (!t) return;
+  const b = document.createElement('button');
+  b.className = 'ib'; b.id = 'btnOcultar'; b.dataset.action = 'ocultar-valores';
+  b.setAttribute('aria-pressed', String(valoresOcultos));
+  b.setAttribute('aria-label', valoresOcultos ? 'Mostrar valores' : 'Ocultar valores');
+  b.title = valoresOcultos ? 'Mostrar valores' : 'Ocultar valores (para ninguém ver ao lado)';
+  b.innerHTML = valoresOcultos ? IC_OLHO_X : IC_OLHO;
+  t.insertBefore(b, t.firstChild);
+};
+ACT['ocultar-valores'] = function(){
+  valoresOcultos = !valoresOcultos;
+  try { localStorage.setItem('ff-ocultar', valoresOcultos ? '1' : '0'); } catch (e) {}
+  if (valoresOcultos) mascarar(); else revelar();
+  renderTop();
+  toast(valoresOcultos ? 'Valores ocultos. Clique no olho para mostrar de novo.' : 'Valores visíveis.');
+};
+let mascaraTimer = 0;
+new MutationObserver(() => { if (!valoresOcultos) return; clearTimeout(mascaraTimer); mascaraTimer = setTimeout(() => mascarar(), 30); })
+  .observe(document.body, {childList:true, subtree:true, characterData:true});
+if (valoresOcultos) { mascarar(); renderTop(); }
