@@ -592,7 +592,7 @@ function pgSituacao(){
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
   return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="baixar-planilha">Baixar planilha</button> <button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
-    veredito + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + '</div><div class="stack">' + dados + '</div></div>' +
+    saudeFiscal(s, veredito) + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + '</div><div class="stack">' + dados + '</div></div>' +
     '<details class="maisinfo" style="margin-top:20px"><summary>Mais informações: vigilância, histórico, atalhos e como autorizar a Receita</summary><div class="stack" style="margin-top:16px">' + vigia + linha + atalhos + passos + '</div></details>' + limites;
 }
 
@@ -814,3 +814,33 @@ SUB.formSemNota = async function(){
   await api('POST', '/api/empresas/' + S.empresaId + '/notas', {tipo:'Venda sem nota', dataEmissao:data, direcao:'emitida', valor:Math.round(valor * 100) / 100, contraparteNome:$('#sdesc').value.trim() || null});
   await refresh('Venda registrada no faturamento.');
 };
+
+/* ---------- Saúde fiscal: uma palavra, com cor, e o que fazer agora ---------- */
+function saudeFiscal(s, veredito){
+  const st = stats(), r = s.resumo || {}, ti = iso(today());
+  const rotulo = o => o.tributo + ' ' + comp(o.venc);
+  const emAtraso = st.atrasadas.reduce((a, o) => a + o.valor, 0);
+  const aVencer = st.abertas.filter(o => o.venc >= ti).sort((a, b) => a.venc < b.venc ? -1 : 1);
+  const prox = aVencer[0];
+  const oficialRuim = r.nivel === 'alerta';
+  const semDados = !st.L.length;
+  let nivel, palavra, regra;
+  if (st.atrasadas.length || oficialRuim) { nivel = 'irregular'; palavra = 'Irregular'; regra = st.atrasadas.length ? 'Há guia atrasada.' : 'Há pendência nas fontes oficiais.'; }
+  else if (st.prox7.length) { nivel = 'atencao'; palavra = 'Atenção'; regra = 'Há guia vencendo em até 7 dias.'; }
+  else if (semDados) { nivel = 'atencao'; palavra = 'Atenção'; regra = 'Ainda não há guias registradas, então não dá para saber.'; }
+  else { nivel = 'regular'; palavra = 'Regular'; regra = 'Nenhuma guia atrasada nem vencendo esta semana.'; }
+  const todo = [];
+  st.atrasadas.sort((a, b) => a.venc < b.venc ? -1 : 1).slice(0, 3).forEach(o => todo.push('Pagar o ' + rotulo(o) + ' (' + brl(o.valor) + '), ou pedir a guia atualizada ao contador.'));
+  if (st.atrasadas.length > 3) todo.push('Mais ' + (st.atrasadas.length - 3) + ' guias atrasadas na lista de Guias.');
+  st.prox7.forEach(o => todo.push('Pagar o ' + rotulo(o) + ' até ' + fmtDate(o.venc) + '.'));
+  if (oficialRuim) todo.push('Conferir a pendência encontrada nas fontes oficiais, mais abaixo.');
+  if (semDados) todo.push('Anexar o PDF das guias para o sistema acompanhar.');
+  const num = (rot, val, sub, cls) => '<div class="sfn ' + (cls || '') + '"><span>' + rot + '</span><b>' + val + '</b><small>' + sub + '</small></div>';
+  return '<section class="card saude ' + nivel + '" aria-live="polite"><div class="saudetop"><div><small>Saúde fiscal</small><h2>' + palavra + '</h2><p>' + esc(regra) + '</p></div></div>' +
+    '<div class="sfnums">' + num('Em atraso', brl(emAtraso), st.atrasadas.length + (st.atrasadas.length === 1 ? ' guia' : ' guias'), st.atrasadas.length ? 'bad' : 'ok') +
+    num('Em aberto', brl(st.totalPend), st.abertas.length + (st.abertas.length === 1 ? ' guia' : ' guias'), '') +
+    num('Próximo vencimento', prox ? fmtDate(prox.venc) : 'Nenhum', prox ? esc(rotulo(prox)) + ' · ' + brl(prox.valor) : 'nada a vencer por enquanto', prox && st.prox7.length ? 'warn' : '') + '</div>' +
+    (todo.length ? '<div class="sfdo"><b>O que fazer agora</b><ul>' + todo.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul></div>' : '<div class="sfdo"><b>Tudo em dia.</b> Continue registrando as guias que chegarem.</div>') +
+    '<p class="hint" style="margin:10px 0 0">Regra: Irregular se há guia atrasada ou pendência oficial; Atenção se há guia vencendo em até 7 dias; Regular nos demais casos.</p>' +
+    (sitErro ? '<p class="err">' + esc(sitErro) + '</p>' : '') + '</section>';
+}

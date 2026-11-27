@@ -306,3 +306,17 @@ h1{letter-spacing:-.018em}
 .maisinfo>summary::before{content:'+';display:inline-block;width:1.4em;font-weight:700;color:var(--brand,#5B3FE0)}
 .maisinfo[open]>summary::before{content:'\2212'}
 .anexarlinha{align-items:center;gap:12px;flex-wrap:wrap}
+
+.saude{padding:22px 24px;border:1px solid var(--line)}
+.saude small{color:var(--ink-2);font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:12px}
+.saude h2{font:800 40px/1.1 var(--f-head);margin:2px 0 4px;letter-spacing:-.02em}
+.saude p{color:var(--ink-2);margin:0}
+.saude.regular{background:var(--ok-bg);border-color:#C9EBD5}.saude.regular h2{color:var(--ok)}
+.saude.atencao{background:#FFF8E1;border-color:#F3E2A6}.saude.atencao h2{color:#9A6B00}
+.saude.irregular{background:var(--bad-bg);border-color:#F6CACA}.saude.irregular h2{color:var(--bad)}
+.sfnums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.sfn{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.sfn span{font-size:13px;color:var(--ink-2)}.sfn b{font:800 24px/1.15 var(--f-head)}.sfn small{text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
+.sfn.bad b{color:var(--bad)}.sfn.ok b{color:var(--ok)}.sfn.warn b{color:#9A6B00}
+.sfdo{margin-top:16px}.sfdo ul{margin:6px 0 0;padding-left:20px}.sfdo li{margin:3px 0}
+@container app (max-width:560px){.sfnums{grid-template-columns:1fr}.saude h2{font-size:34px}}
