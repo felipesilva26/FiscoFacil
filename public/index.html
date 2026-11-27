@@ -680,6 +680,98 @@ button.pt{cursor:pointer}button.pt:hover b{text-decoration:underline}
 .al.ok{border-color:#C9EBD5;border-left-color:var(--ok);background:#F1FBF4}.al.ok .t{color:var(--ok)}
 .pt.rec:before{background:var(--ok)}.pt.rec small{color:var(--ok)}
 
+/* ===== Layout compacto (Início) ===== */
+@container app (min-width:1180px){
+  .col{position:relative}
+  .col>.topbar{position:absolute;top:20px;right:max(16px,env(safe-area-inset-right,0px));z-index:5;width:auto}
+  .col #main .pagehead{padding-right:340px;min-height:44px}
+}
+.col{gap:14px}
+.pagetools{display:flex;gap:8px;flex-wrap:wrap}
+.saude{padding:16px 20px}
+.saudetop{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);gap:16px;align-items:center}
+.saude h2{font-size:30px;margin:0}
+.saude p{font-size:13px}
+.sfnums{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:0}
+.sfn{padding:9px 11px}.sfn b{font-size:18px}.sfn span{font-size:12px}.sfn small{font-size:11.5px}
+.sfdo{margin-top:12px;font-size:13px}
+@container app (max-width:1100px){.sfnums{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container app (max-width:860px){.saudetop{grid-template-columns:1fr}.sfnums{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.avisos .chead,.grafico .chead,.proximos .chead{align-items:center;gap:12px;flex-wrap:wrap}
+.hint{color:var(--muted);font-size:12.5px}
+
+/* carrossel */
+.car{position:relative}
+.car .carr{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;cursor:grab;padding:4px 2px 8px;-webkit-overflow-scrolling:touch}
+.car .carr::-webkit-scrollbar{display:none}
+.car .carr.arrastando{cursor:grabbing;scroll-snap-type:none;user-select:none}
+.car .al{flex:0 0 290px;min-width:0;scroll-snap-align:start}
+.car .pt{flex:0 0 190px;min-width:0;scroll-snap-align:start}
+.carnav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);box-shadow:var(--shadow);display:grid;place-items:center;cursor:pointer}
+.carnav.prev{left:-20px;transform:translateY(-50%) scaleX(-1)}.carnav.next{right:-20px}
+.carnav:hover{background:var(--soft)}
+@media (hover:none){.carnav{display:none}}
+.proximos .carnav{top:40%}
+
+/* gráfico menor */
+.barras{height:130px;margin-bottom:22px;margin-top:6px}
+.bcol .bv{font-size:10px}
+.leg{margin:0}
+@container app (max-width:560px){.barras{height:120px}}
+
+/* sair */
+.side{gap:18px}
+.sairbtn{margin-top:auto;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:0;background:none;color:var(--side-ink);font-weight:600;cursor:pointer;width:100%;text-align:left}
+.sairbtn:hover{background:var(--side-hover);color:var(--side-strong)}
+.sidestatus{margin-top:0}
+@container app (min-width:701px) and (max-width:1179px){.sairbtn span{display:none}.sairbtn{justify-content:center;padding:12px 0}}
+@container app (max-width:700px){.sairbtn{display:none}}
+
+/* Guias e pagamentos */
+.resumoguias{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rs{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:1px}
+.rs span{font-size:12.5px;color:var(--muted)}.rs b{font:800 21px/1.2 var(--f-head)}.rs small{font-size:12px;color:var(--muted)}
+.rs.bad b{color:var(--bad)}.rs.ok b{color:var(--ok)}
+@container app (max-width:560px){.resumoguias{grid-template-columns:1fr}}
+.guiaslista td,.guiaslista th{padding-top:9px;padding-bottom:9px}
+
+/* seletor de tema */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:none;padding:9px 18px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand-text)}
+
+/* ===== Tema escuro ===== */
+:root[data-theme=dark]{--ink-2:#B4BCDA;
+  --bg:#0E1220;--card:#171C30;--ink:#E8EBF7;--muted:#9AA3C2;--line:#272E4A;--soft:#1F2540;
+  --brand:#8B74FF;--brand-text:#B3A2FF;--brand-soft:#2A2456;--btn:#7C62FA;--blue:#6C93FF;--blue-soft:#1F2C55;
+  --side:#0A0E1C;--side-hover:#171D38;
+  --ok:#4ADE80;--ok-bg:#12301F;--warn:#FB923C;--warn-bg:#35210F;--bad:#FF6B6B;--bad-bg:#3A1717;
+  --violet-bg:#2A2456;--promo-a:#1B1F3B;--promo-b:#172037;--promo-line:#2C3358;--pill:#222948;--me:#2E2860;--today-bg:#3A2412;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);color-scheme:dark;
+}
+:root[data-theme=dark] .saude.regular{background:var(--ok-bg);border-color:#1F4A30}
+:root[data-theme=dark] .saude.atencao{background:#33270C;border-color:#5A4514}:root[data-theme=dark] .saude.atencao h2,:root[data-theme=dark] .saude.atencao .sfn.warn b{color:#F5C451}
+:root[data-theme=dark] .saude.irregular{background:var(--bad-bg);border-color:#5E2626}
+:root[data-theme=dark] .sfn{background:var(--card);border-color:var(--line)}
+:root[data-theme=dark] .al{background:#2E1A1D;border-color:#5E2B2B;border-left-color:var(--bad)}
+:root[data-theme=dark] .al.warn{background:#2F2610;border-color:#5A4514;border-left-color:#E0A100}
+:root[data-theme=dark] .al.info{background:#17233F;border-color:#2A3F72;border-left-color:var(--blue)}
+:root[data-theme=dark] .al.ok{background:#12301F;border-color:#1F4A30;border-left-color:var(--ok)}
+:root[data-theme=dark] .al.warn .t,:root[data-theme=dark] .pt.warn small{color:#F5C451}
+:root[data-theme=dark] .maisinfo>summary{background:var(--card);border-color:var(--line)}
+:root[data-theme=dark] .pt{border-top-color:var(--line)}
+:root[data-theme=dark] .d.vazio,:root[data-theme=dark] .bar.vazio{background:#3A4163}
+:root[data-theme=dark] input,:root[data-theme=dark] select,:root[data-theme=dark] textarea,:root[data-theme=dark] .in{background:var(--soft);color:var(--ink);border-color:var(--line)}
+:root[data-theme=dark] .btn.soft{background:var(--soft);color:var(--ink)}
+:root[data-theme=dark] .btn.ghost{color:var(--ink);border-color:var(--line)}
+:root[data-theme=dark] .modal,:root[data-theme=dark] [role=dialog]{background:var(--card);color:var(--ink)}
+:root[data-theme=dark] table th{color:var(--muted)}
+:root[data-theme=dark] tr,:root[data-theme=dark] td,:root[data-theme=dark] th{border-color:var(--line)}
+:root[data-theme=dark] a:not(.avatar){color:var(--brand-text)}
+:root[data-theme=dark] .nav a,:root[data-theme=dark] .sairbtn{color:var(--side-ink)}
+:root[data-theme=dark] .nav a[aria-current="page"]{color:#fff}
+
 </style>
 
 <div class="frame" id="frame">
@@ -1179,6 +1271,11 @@ function renderModal(){
       '<li class="step"><span class="sn">3</span><div><b>Falar com o contador</b><p class="hint">Vale muito a pena se os valores forem altos, se houver dúvida sobre qual guia emitir ou se a empresa corre risco de ser excluída do Simples.</p></div></li></ol>' +
       '<div class="actions" style="justify-content:flex-start"><a class="btn primary" href="https://www8.receita.fazenda.gov.br/simplesnacional/" target="_blank" rel="noopener">Abrir o Simples Nacional</a><a class="btn ghost" href="https://cav.receita.fazenda.gov.br/" target="_blank" rel="noopener">Abrir o e-CAC (parcelamento)</a></div>' +
       '<p class="hint">Este texto é um guia geral, não é orientação contábil. Os valores atualizados e as regras de parcelamento só a Receita informa.</p>';
+  } else if (m.t === 'sair') {
+    title = 'Sair do sistema?';
+    body = '<p class="sub" style="margin:0 0 10px">Você usa o FiscoFácil <b>sem cadastro</b>: este navegador é a chave dos seus dados. Se sair agora, você <b>não consegue voltar</b> às empresas, guias e notas que já cadastrou.</p>' +
+      '<p class="sub" style="margin:0 0 14px">Para poder sair e entrar de qualquer aparelho, crie antes um e-mail e uma senha em Configurações.</p>' +
+      '<div class="actions"><button class="btn ghost" data-action="fechar">Cancelar</button><button class="btn primary" data-action="ir-config">Criar e-mail e senha</button><button class="btn danger" data-action="sair-ok">Sair mesmo assim</button></div>';
   } else if (m.t === 'novaemp') {
     title = 'Adicionar empresa';
     body = '<form id="formNovaEmp" class="form">' + field('mnome', 'Nome da empresa', '<input id="mnome" class="in" autocomplete="off" autofocus>') +
@@ -1951,7 +2048,7 @@ function pgSituacao(){
     '<ul class="atalhos">' + L.todos.map(l => '<li><a href="' + l.url + '" target="_blank" rel="noopener"><span><b>' + esc(l.txt) + '</b><small>' + esc(l.desc) + '</small></span>' + ic('right', 16) + '</a></li>').join('') + '</ul>' +
     '<p class="hint" style="margin-top:10px">Os links de estado e prefeitura abrem uma busca, porque cada um tem o seu site. Confira sempre se o endereço termina em .gov.br.</p>');
   const limites = '<p class="hint sitlimits">Esta verificação não cobre: ' + s.naoCobre.map(esc).join('; ') + '.</p>';
-  return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<button class="btn ghost" data-action="baixar-planilha">Baixar planilha</button> <button class="btn ghost" data-action="sit-atualizar">Atualizar agora</button>') +
+  return head('Situação da empresa', esc(e.nome) + ' · ' + esc(fmtCnpj(e.cnpj || '')), '<div class="pagetools"><button class="btn ghost sm" data-action="baixar-planilha">Baixar planilha</button><button class="btn ghost sm" data-action="sit-atualizar">Atualizar agora</button></div>') +
     saudeFiscal(s, veredito) + painelAvisos() + confirmarMei(s) + numerosInicio(s) + (meiSec || divida ? '<div class="stack" style="margin-top:20px">' + meiSec + divida + '</div>' : '') + '<div class="cols" style="margin-top:20px"><div class="stack">' + lista + '</div><div class="stack">' + dados + '</div></div>' +
     '<details class="maisinfo" style="margin-top:20px"><summary>Mais informações: vigilância, histórico, atalhos e como autorizar a Receita</summary><div class="stack" style="margin-top:16px">' + vigia + linha + atalhos + passos + '</div></details>' + limites;
 }
@@ -1991,12 +2088,12 @@ function numerosInicio(s){
   }
   const kp = (icone, tom, rot, sub, val, vt) => '<div class="card kpi"><span class="kicon ' + tom + '">' + icone + '</span><div><div class="klabel">' + rot + '</div><div class="ksub">' + sub + '</div><div class="kval' + (vt ? ' ' + vt : '') + '">' + val + '</div></div></div>';
   const pagoMei = m.tem ? Math.max(m.pagos, st.pagosMes) : 0;
-  return '<div class="kpis kpis3" style="margin-top:20px">' +
+  return (!m.tem ? '' : '<div class="kpis kpis3" style="margin-top:20px">' +
     kp(ic('alert', 24), 'bad', 'Em aberto', st.abertas.length ? st.abertas.length + (st.abertas.length === 1 ? ' guia' : ' guias') + (m.n ? ' + ' + reais(m.valor) + ' a confirmar' : '') : (m.n ? 'mais ' + reais(m.valor) + ' do DAS-MEI a confirmar' : 'nenhuma guia pendente'), brl(st.totalPend), st.totalPend ? 'bad' : '') +
     kp(ic('calendar', 24), 'brand', 'Vencem em 7 dias', st.prox7.length ? (st.prox7.length === 1 ? 'guia' : 'guias') : 'nada vence nesta semana', st.prox7.length) +
     (m.tem
       ? kp(ic('check', 24), 'ok', 'Pago', pagoMei ? 'DAS-MEI confirmados (últimos meses)' : 'confirme os meses do DAS-MEI abaixo', brl(pagoMei), 'ok')
-      : kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, st.pagosMes ? 'pagamentos registrados' : 'nenhum pagamento registrado neste mês', brl(st.pagosMes), 'ok')) + '</div>' +
+      : kp(ic('check', 24), 'ok', 'Pago em ' + mesNome, st.pagosMes ? 'pagamentos registrados' : 'nenhum pagamento registrado neste mês', brl(st.pagosMes), 'ok')) + '</div>') +
     '<div class="actions anexarlinha" style="justify-content:flex-start;margin-top:12px">' + entrada + botaoAnexar('soft sm') + '<button class="btn ghost sm" data-action="debitos">Cadastrar débitos em atraso</button><span class="hint">Anexe o PDF da guia ou do comprovante: o sistema lê e você só confere.</span></div>';
 }
 /* Anexar vários PDFs de uma vez, direto no Início: lê todos e pede a conferência um a um. */
@@ -2175,36 +2272,6 @@ SUB.formSemNota = async function(){
   await refresh('Venda registrada no faturamento.');
 };
 
-/* ---------- Saúde fiscal: uma palavra, com cor, e o que fazer agora ---------- */
-function saudeFiscal(s, veredito){
-  const st = stats(), r = s.resumo || {}, ti = iso(today());
-  const rotulo = o => o.tributo + ' ' + comp(o.venc);
-  const emAtraso = st.atrasadas.reduce((a, o) => a + o.valor, 0);
-  const aVencer = st.abertas.filter(o => o.venc >= ti).sort((a, b) => a.venc < b.venc ? -1 : 1);
-  const prox = aVencer[0];
-  const oficialRuim = (s.blocos || []).some(b => b.id !== 'guias' && b.nivel === 'alerta');
-  const semDados = !st.L.length;
-  let nivel, palavra, regra;
-  if (st.atrasadas.length || oficialRuim) { nivel = 'irregular'; palavra = 'Irregular'; regra = st.atrasadas.length ? 'Há guia atrasada.' : 'Há pendência nas fontes oficiais.'; }
-  else if (st.prox7.length) { nivel = 'atencao'; palavra = 'Atenção'; regra = 'Há guia vencendo em até 7 dias.'; }
-  else if (semDados) { nivel = 'atencao'; palavra = 'Atenção'; regra = 'Ainda não há guias registradas, então não dá para saber.'; }
-  else { nivel = 'regular'; palavra = 'Regular'; regra = 'Nenhuma guia atrasada nem vencendo esta semana.'; }
-  const todo = [];
-  st.atrasadas.sort((a, b) => a.venc < b.venc ? -1 : 1).slice(0, 3).forEach(o => todo.push('Pagar o ' + rotulo(o) + ' (' + brl(o.valor) + '), ou pedir a guia atualizada ao contador.'));
-  if (st.atrasadas.length > 3) todo.push('Mais ' + (st.atrasadas.length - 3) + ' guias atrasadas na lista de Guias.');
-  st.prox7.forEach(o => todo.push('Pagar o ' + rotulo(o) + ' até ' + fmtDate(o.venc) + '.'));
-  if (oficialRuim) todo.push('Conferir a pendência encontrada nas fontes oficiais, mais abaixo.');
-  if (semDados) todo.push('Anexar o PDF das guias para o sistema acompanhar.');
-  const num = (rot, val, sub, cls) => '<div class="sfn ' + (cls || '') + '"><span>' + rot + '</span><b>' + val + '</b><small>' + sub + '</small></div>';
-  return '<section class="card saude ' + nivel + '" aria-live="polite"><div class="saudetop"><div><small>Saúde fiscal</small><h2>' + palavra + '</h2><p>' + esc(regra) + '</p></div></div>' +
-    '<div class="sfnums">' + num('Em atraso', brl(emAtraso), st.atrasadas.length + (st.atrasadas.length === 1 ? ' guia' : ' guias'), st.atrasadas.length ? 'bad' : 'ok') +
-    num('Em aberto', brl(st.totalPend), st.abertas.length + (st.abertas.length === 1 ? ' guia' : ' guias'), '') +
-    num('Próximo vencimento', prox ? fmtDate(prox.venc) : 'Nenhum', prox ? esc(rotulo(prox)) + ' · ' + brl(prox.valor) : 'nada a vencer por enquanto', prox && st.prox7.length ? 'warn' : '') + '</div>' +
-    (todo.length ? '<div class="sfdo"><b>O que fazer agora</b><ul>' + todo.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul></div>' : '<div class="sfdo"><b>Tudo em dia.</b> Continue registrando as guias que chegarem.</div>') +
-    '<p class="hint" style="margin:10px 0 0">Regra: Irregular se há guia atrasada ou pendência oficial; Atenção se há guia vencendo em até 7 dias; Regular nos demais casos.</p>' +
-    (sitErro ? '<p class="err">' + esc(sitErro) + '</p>' : '') + '</section>';
-}
-
 /* ---------- Ocultar valores (privacidade): troca "R$ 1.234,56" por "R$ ••••" na tela ---------- */
 let valoresOcultos = false;
 try { valoresOcultos = localStorage.getItem('ff-ocultar') === '1'; } catch (e) {}
@@ -2243,7 +2310,41 @@ new MutationObserver(() => { if (!valoresOcultos) return; clearTimeout(mascaraTi
   .observe(document.body, {childList:true, subtree:true, characterData:true});
 if (valoresOcultos) { mascarar(); renderTop(); }
 
-/* ---------- Ações imediatas, gráfico dos 12 meses e próximos vencimentos ---------- */
+ACT.recebi = rodar(async el => { await api('POST', '/api/notas/' + el.dataset.id + '/recebido'); await refresh('Recebimento registrado.'); });
+
+/* ---------- Saúde fiscal compacta: palavra + todos os números juntos ---------- */
+function saudeFiscal(s, veredito){
+  const st = stats(), t = today(), ti = iso(t), mesNome = MESES[t.getMonth()].toLowerCase();
+  const rotulo = o => o.tributo + ' ' + comp(o.venc);
+  const emAtraso = st.atrasadas.reduce((a, o) => a + o.valor, 0);
+  const prox = st.abertas.filter(o => o.venc >= ti).sort((a, b) => a.venc < b.venc ? -1 : 1)[0];
+  const oficialRuim = (s.blocos || []).some(b => b.id !== 'guias' && b.nivel === 'alerta');
+  const semDados = !st.L.length;
+  let nivel, palavra, regra;
+  if (st.atrasadas.length || oficialRuim) { nivel = 'irregular'; palavra = 'Irregular'; regra = st.atrasadas.length ? 'Há guia atrasada.' : 'Há pendência nas fontes oficiais.'; }
+  else if (st.prox7.length) { nivel = 'atencao'; palavra = 'Atenção'; regra = 'Há guia vencendo em até 7 dias.'; }
+  else if (semDados) { nivel = 'atencao'; palavra = 'Atenção'; regra = 'Ainda não há guias registradas.'; }
+  else { nivel = 'regular'; palavra = 'Regular'; regra = 'Nenhuma guia atrasada nem vencendo esta semana.'; }
+  const todo = [];
+  st.atrasadas.slice().sort((a, b) => a.venc < b.venc ? -1 : 1).slice(0, 2).forEach(o => todo.push('Pagar o ' + rotulo(o) + ' (' + brl(o.valor) + ')'));
+  if (st.atrasadas.length > 2) todo.push('mais ' + (st.atrasadas.length - 2) + ' atrasadas');
+  st.prox7.forEach(o => todo.push('Pagar o ' + rotulo(o) + ' até ' + fmtDate(o.venc)));
+  if (oficialRuim) todo.push('Conferir a pendência oficial abaixo');
+  if (semDados) todo.push('Anexar o PDF das guias');
+  const num = (rot, val, sub, cls) => '<div class="sfn ' + (cls || '') + '"><span>' + rot + '</span><b>' + val + '</b><small>' + sub + '</small></div>';
+  return '<section class="card saude ' + nivel + '" aria-live="polite" title="Regra: Irregular se há guia atrasada ou pendência oficial; Atenção se há guia vencendo em até 7 dias; Regular nos demais casos.">' +
+    '<div class="saudetop"><div class="saudeword"><small>Saúde fiscal</small><h2>' + palavra + '</h2><p>' + esc(regra) + '</p></div>' +
+    '<div class="sfnums">' + num('Em atraso', brl(emAtraso), st.atrasadas.length + (st.atrasadas.length === 1 ? ' guia' : ' guias'), st.atrasadas.length ? 'bad' : 'ok') +
+    num('Em aberto', brl(st.totalPend), st.abertas.length + (st.abertas.length === 1 ? ' guia' : ' guias'), '') +
+    num('Vencem em 7 dias', String(st.prox7.length), st.prox7.length ? 'pague até o vencimento' : 'nada esta semana', st.prox7.length ? 'warn' : '') +
+    num('Pago em ' + mesNome, brl(st.pagosMes), st.pagosMes ? 'pagamentos registrados' : 'nenhum ainda', 'ok') +
+    num('Próximo vencimento', prox ? fmtDate(prox.venc) : 'Nenhum', prox ? esc(rotulo(prox)) + ' · ' + brl(prox.valor) : 'nada a vencer', prox && st.prox7.length ? 'warn' : '') + '</div></div>' +
+    '<div class="sfdo"><b>O que fazer agora:</b> ' + (todo.length ? todo.map(esc).join(' · ') : 'tudo em dia. Continue registrando as guias que chegarem.') + '</div>' +
+    (sitErro ? '<p class="err">' + esc(sitErro) + '</p>' : '') + '</section>';
+}
+
+/* ---------- Ações imediatas, gráfico e próximos vencimentos (carrosséis que arrastam) ---------- */
+const carrossel = (cls, itens) => '<div class="car"><button class="carnav prev" data-action="car-prev" aria-label="Anterior">' + ic('right', 18) + '</button><div class="carr ' + cls + '" data-car tabindex="0">' + itens.join('') + '</div><button class="carnav next" data-action="car-next" aria-label="Próximo">' + ic('right', 18) + '</button></div>';
 function painelAvisos(){
   const st = stats(), t = today(), ti = iso(t), ano = t.getFullYear();
   const rotulo = o => o.tributo + ' ' + comp(o.venc);
@@ -2251,22 +2352,18 @@ function painelAvisos(){
   const atr = abert.filter(o => o.venc < ti);
   const cards = [];
   const cartao = (cls, rot, quando, titulo, texto, btn, acao, id) => '<div class="al ' + cls + '"><div class="t"><span>' + rot + '</span><span>' + quando + '</span></div><b>' + esc(titulo) + '</b><span class="tx">' + esc(texto) + '</span><button class="btn soft sm" data-action="' + acao + '"' + (id ? ' data-id="' + id + '"' : '') + '>' + esc(btn) + '</button></div>';
-  if (atr.length) {
-    const o = atr[0], dias = -diffDays(o.venc, t);
-    cards.push(cartao('', 'CRÍTICO', dias + (dias === 1 ? ' DIA' : ' DIAS') + ' DE ATRASO', rotulo(o) + ' atrasado', brl(o.valor) + '. Venceu em ' + fmtDate(o.venc) + '. A Receita soma multa e juros.', 'Pagar esta guia', 'abrir-pagamento', o.id));
-    if (atr.length > 1) cards.push(cartao('', 'CRÍTICO', 'REGULARIZAR', (atr.length - 1) + (atr.length === 2 ? ' outra guia atrasada' : ' outras guias atrasadas'), 'Somam ' + brl(atr.slice(1).reduce((a, x) => a + x.valor, 0)) + '. Veja pagamento à vista ou parcelamento.', 'Ver como regularizar', 'regularizar'));
-  }
-  abert.filter(o => o.venc >= ti && diffDays(o.venc, t) <= 7).forEach(o => { const d = diffDays(o.venc, t); cards.push(cartao('warn', 'ATENÇÃO', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', rotulo(o) + ' vence ' + fmtDate(o.venc), brl(o.valor) + '. Pague até o vencimento para evitar multa.', 'Pagar esta guia', 'abrir-pagamento', o.id)); });
+  if (atr.length > 1) cards.push(cartao('', 'CRÍTICO', 'REGULARIZAR', atr.length + ' guias atrasadas', 'Somam ' + brl(atr.reduce((a, x) => a + x.valor, 0)) + '. Veja pagamento à vista ou parcelamento.', 'Ver como regularizar', 'regularizar'));
+  atr.forEach(o => { const dias = -diffDays(o.venc, t); cards.push(cartao('', 'CRÍTICO', dias + (dias === 1 ? ' DIA' : ' DIAS') + ' DE ATRASO', rotulo(o) + ' atrasado', brl(o.valor) + '. Venceu em ' + fmtDate(o.venc) + '.', 'Pagar esta guia', 'abrir-pagamento', o.id)); });
+  abert.filter(o => o.venc >= ti && diffDays(o.venc, t) <= 7).forEach(o => { const d = diffDays(o.venc, t); cards.push(cartao('warn', 'ATENÇÃO', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', rotulo(o) + ' vence ' + fmtDate(o.venc), brl(o.valor) + '. Pague até o vencimento.', 'Pagar esta guia', 'abrir-pagamento', o.id)); });
   const NN = NOTAS[S.empresaId], aRec = NN ? NN.notas.filter(n => n.direcao === 'emitida' && n.receberEm && !n.recebidoEm).sort((x, y) => x.receberEm < y.receberEm ? -1 : 1) : [];
   const cli = n => n.contraparteNome || (n.contraparteDoc ? fmtDoc(n.contraparteDoc) : 'o cliente');
-  aRec.filter(n => n.receberEm < ti).slice(0, 2).forEach(n => cards.push(cartao('warn', 'CONFIRME', 'PREVISTO ' + fmtDate(n.receberEm), 'Você recebeu ' + brl(n.valor) + '?', 'De ' + cli(n) + (n.numero ? ', nota nº ' + n.numero : '') + '. Se já caiu na conta, marque como recebido.', 'Já recebi', 'recebi', n.id)));
-  aRec.filter(n => n.receberEm >= ti).slice(0, 2).forEach(n => { const d = diffDays(n.receberEm, t); cards.push(cartao('ok', 'A RECEBER', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', 'Dia ' + fmtDate(n.receberEm) + ' você vai receber ' + brl(n.valor), 'De ' + cli(n) + (n.numero ? ', nota nº ' + n.numero : '') + '.', 'Já recebi', 'recebi', n.id)); });
+  aRec.filter(n => n.receberEm < ti).forEach(n => cards.push(cartao('warn', 'CONFIRME', 'PREVISTO ' + fmtDate(n.receberEm), 'Você recebeu ' + brl(n.valor) + '?', 'De ' + cli(n) + (n.numero ? ', nota nº ' + n.numero : '') + '.', 'Já recebi', 'recebi', n.id)));
+  aRec.filter(n => n.receberEm >= ti).forEach(n => { const d = diffDays(n.receberEm, t); cards.push(cartao('ok', 'A RECEBER', d === 0 ? 'HOJE' : d === 1 ? 'AMANHÃ' : 'EM ' + d + ' DIAS', 'Dia ' + fmtDate(n.receberEm) + ' você recebe ' + brl(n.valor), 'De ' + cli(n) + (n.numero ? ', nota nº ' + n.numero : '') + '.', 'Já recebi', 'recebi', n.id)); });
   const proxima = abert.find(o => o.venc >= ti && diffDays(o.venc, t) > 7);
-  if (proxima && cards.length < 5) cards.push(cartao('info', 'LEMBRETE', 'EM ' + diffDays(proxima.venc, t) + ' DIAS', rotulo(proxima) + ' vence ' + fmtDate(proxima.venc), brl(proxima.valor) + '. Ainda dá tempo.', 'Ver como pagar', 'abrir-pagamento', proxima.id));
+  if (proxima) cards.push(cartao('info', 'LEMBRETE', 'EM ' + diffDays(proxima.venc, t) + ' DIAS', rotulo(proxima) + ' vence ' + fmtDate(proxima.venc), brl(proxima.valor) + '. Ainda dá tempo.', 'Ver como pagar', 'abrir-pagamento', proxima.id));
   if (!st.L.length) cards.push('<div class="al info"><div class="t"><span>COMECE AQUI</span><span></span></div><b>Nenhuma guia registrada</b><span class="tx">Anexe o PDF da guia para o sistema acompanhar os vencimentos.</span></div>');
-  const aviso = cards.length ? '<section class="card avisos" style="margin-top:20px"><div class="chead"><h2>Ações imediatas</h2></div><div class="alcards">' + cards.join('') + '</div></section>' : '';
+  const aviso = cards.length ? '<section class="card avisos"><div class="chead"><h2>Ações imediatas</h2><span class="hint">' + cards.length + (cards.length === 1 ? ' aviso' : ' avisos') + (cards.length > 3 ? ' · arraste para o lado' : '') + '</span></div>' + carrossel('alcards', cards) + '</section>' : '';
 
-  /* gráfico: uma barra por mês de competência do ano */
   const MES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const meses = MES.map((n, i) => ({n:n, i:i, g:[]}));
   st.L.forEach(o => { const c = comp(o.venc), mm = Number(c.slice(0, 2)) - 1, yy = Number(c.slice(3)); if (yy === ano && meses[mm]) meses[mm].g.push(o); });
@@ -2275,26 +2372,72 @@ function painelAvisos(){
     m.cls = !m.g.length ? 'vazio' : m.g.some(o => !o.pagoEm && o.venc < ti) ? 'bad' : m.g.some(o => !o.pagoEm) ? 'warn' : 'ok';
     if (m.cls === 'bad') nA += m.g.filter(o => !o.pagoEm && o.venc < ti).length; else if (m.cls === 'warn') nV += m.g.filter(o => !o.pagoEm).length; if (m.cls === 'ok') nP += m.g.length; });
   const mesAtual = t.getMonth();
-  const barras = meses.map(m => { const h = m.v ? Math.max(8, Math.sqrt(m.v / maxV) * 140) : 6, alvo = m.g.find(o => !o.pagoEm) || m.g[0];
-    const txt = m.v ? brl(m.v) : 'sem guia';
+  const barras = meses.map(m => { const h = m.v ? Math.max(6, Math.sqrt(m.v / maxV) * 70) : 4, alvo = m.g.find(o => !o.pagoEm) || m.g[0];
     const tit = MES[m.i] + ': ' + (m.v ? m.g.length + (m.g.length === 1 ? ' guia' : ' guias') + ', ' + brl(m.v) : 'nenhuma guia cadastrada');
-    const inner = '<span class="bv">' + txt + '</span><i class="bar ' + m.cls + (m.i === mesAtual ? ' hoje' : '') + '" style="height:' + h + 'px"></i><em>' + m.n + '</em>';
+    const inner = '<span class="bv">' + (m.v ? brl(m.v) : '') + '</span><i class="bar ' + m.cls + (m.i === mesAtual ? ' hoje' : '') + '" style="height:' + h + 'px"></i><em>' + m.n + '</em>';
     return alvo ? '<button class="bcol" data-action="abrir-pagamento" data-id="' + alvo.id + '" title="' + esc(tit) + '" aria-label="' + esc(tit) + '">' + inner + '</button>' : '<div class="bcol" title="' + esc(tit) + '">' + inner + '</div>'; }).join('');
-  const grafico = '<section class="card" style="margin-top:20px"><div class="chead"><h2>Guias de ' + ano + ', mês a mês</h2></div><p class="sub" style="margin:0">Cada barra é um mês de competência. Clique em uma barra para ver como pagar.</p>' +
-    '<div class="leg"><span><i class="d ok"></i>Paga ' + nP + '</span><span><i class="d bad"></i>Atrasada ' + nA + '</span><span><i class="d warn"></i>A vencer ' + nV + '</span><span><i class="d vazio"></i>Sem guia</span></div><div class="barras">' + barras + '</div></section>';
+  const grafico = '<section class="card grafico"><div class="chead"><h2>Guias de ' + ano + ', mês a mês</h2><div class="leg"><span><i class="d ok"></i>Paga ' + nP + '</span><span><i class="d bad"></i>Atrasada ' + nA + '</span><span><i class="d warn"></i>A vencer ' + nV + '</span><span><i class="d vazio"></i>Sem guia</span></div></div><div class="barras">' + barras + '</div></section>';
 
-  /* linha do tempo: hoje + próximos vencimentos cadastrados */
-  const itens = st.L.filter(o => o.venc >= ti).map(o => ({d:o.venc, o:o})).concat(aRec.filter(n => n.receberEm >= ti).map(n => ({d:n.receberEm, n:n}))).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 5);
-  const futuras = itens;
   const quando = d => { const k = diffDays(d, t); return fmtDate(d) + ' · ' + (k === 0 ? 'hoje' : k === 1 ? 'amanhã' : 'em ' + k + ' dias'); };
+  const itens = st.L.filter(o => o.venc >= ti).map(o => ({d:o.venc, o:o})).concat(aRec.filter(n => n.receberEm >= ti).map(n => ({d:n.receberEm, n:n}))).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 14);
   const pontos = ['<div class="pt ' + (atr.length ? 'bad' : 'ok') + '"><small>Hoje · ' + fmtDate(ti) + '</small><b>' + (atr.length ? atr.length + (atr.length === 1 ? ' guia atrasada' : ' guias atrasadas') : 'Nada atrasado') + '</b><span>' + (atr.length ? brl(atr.reduce((a, o) => a + o.valor, 0)) + ' em atraso' : 'Tudo em dia') + '</span></div>']
     .concat(itens.map(x => { if (x.n) return '<button class="pt rec" data-action="recebi" data-id="' + x.n.id + '" title="Clique para marcar como recebido"><small>' + quando(x.d) + '</small><b>Receber ' + brl(x.n.valor) + '</b><span>' + esc(cli(x.n)) + (x.n.numero ? ' · nota nº ' + esc(x.n.numero) : '') + '</span></button>';
       const o = x.o, d = diffDays(o.venc, t); return '<button class="pt ' + (o.pagoEm ? 'ok' : d <= 7 ? 'warn' : '') + '" data-action="abrir-pagamento" data-id="' + o.id + '"><small>' + quando(o.venc) + '</small><b>' + esc(rotulo(o)) + '</b><span>' + (o.pagoEm ? 'Já paga em ' + fmtDate(o.pagoEm) : brl(o.valor)) + '</span></button>'; }));
-  const linha = '<section class="card" style="margin-top:20px"><div class="chead"><h2>O que vem a seguir</h2></div>' + (itens.length ? '' : '<p class="sub" style="margin:0 0 6px">Ainda não há guias nem recebimentos futuros cadastrados. Anexe as próximas guias e as notas de venda para elas aparecerem aqui.</p>') + '<div class="crono">' + pontos.join('') + '</div></section>';
+  const linha = '<section class="card proximos"><div class="chead"><h2>O que vem a seguir</h2>' + (itens.length ? '' : '<span class="hint">Anexe as próximas guias e notas de venda para aparecerem aqui.</span>') + '</div>' + carrossel('crono', pontos) + '</section>';
   return aviso + grafico + linha;
 }
 
-ACT.recebi = rodar(async el => { await api('POST', '/api/notas/' + el.dataset.id + '/recebido'); await refresh('Recebimento registrado.'); });
+/* ---------- Carrossel: arrastar com o mouse e setas ---------- */
+(function(){
+  let el = null, x0 = 0, s0 = 0, moveu = false;
+  document.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; const c = e.target.closest && e.target.closest('[data-car]'); if (!c) return; el = c; x0 = e.clientX; s0 = c.scrollLeft; moveu = false; });
+  document.addEventListener('pointermove', e => { if (!el) return; const dx = e.clientX - x0; if (Math.abs(dx) > 5) { moveu = true; el.classList.add('arrastando'); } if (moveu) el.scrollLeft = s0 - dx; });
+  const fim = () => { if (el) { el.classList.remove('arrastando'); } el = null; };
+  document.addEventListener('pointerup', fim); document.addEventListener('pointercancel', fim);
+  document.addEventListener('click', e => { if (moveu) { e.stopPropagation(); e.preventDefault(); moveu = false; } }, true);
+  const rolar = (b, dir) => { const c = b.parentNode.querySelector('[data-car]'); if (c) c.scrollBy({left:dir * Math.max(240, c.clientWidth * .7), behavior:'smooth'}); };
+  ACT['car-prev'] = el => rolar(el, -1); ACT['car-next'] = el => rolar(el, 1);
+})();
+ACT['sair-ok'] = () => { closeModal(); logout(); };
+ACT['ir-config'] = () => { closeModal(); location.hash = '#configuracoes'; };
+
+/* ---------- Botão Sair no fim da barra lateral ---------- */
+const IC_SAIR = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+const _renderSideSair = renderSide;
+renderSide = function(){ _renderSideSair.apply(this, arguments); const sd = $('#side'); if (!sd) return; const b = document.createElement('button'); b.type = 'button'; b.className = 'sairbtn'; b.dataset.action = 'sair-pedir'; b.innerHTML = IC_SAIR + '<span>Sair</span>'; sd.appendChild(b); };
+ACT['sair-pedir'] = () => { if (S.user && S.user.anonimo) { ui.modal = {t:'sair'}; renderModal(); } else logout(); };
+
+/* ---------- Guias e pagamentos: resumo no topo e ação "Pagar" ---------- */
+const _pgGuias2 = pgGuias;
+pgGuias = function(){
+  let h = _pgGuias2();
+  if (ui.gv === 'cal') return h;
+  const st = stats(), ti = iso(today()), aV = st.abertas.filter(o => o.venc >= ti);
+  const chip = (cls, rot, val, sub) => '<div class="rs ' + cls + '"><span>' + rot + '</span><b>' + val + '</b><small>' + sub + '</small></div>';
+  const resumo = '<div class="resumoguias">' + chip(st.atrasadas.length ? 'bad' : 'ok', 'Em atraso', brl(st.atrasadas.reduce((a, o) => a + o.valor, 0)), st.atrasadas.length + (st.atrasadas.length === 1 ? ' guia' : ' guias')) +
+    chip('', 'A vencer', brl(aV.reduce((a, o) => a + o.valor, 0)), aV.length + (aV.length === 1 ? ' guia' : ' guias')) +
+    chip('ok', 'Pagas', brl(st.L.filter(o => o.pagoEm).reduce((a, o) => a + o.valor, 0)), st.L.filter(o => o.pagoEm).length + ' no total') + '</div>';
+  h = h.replace('<section class="card" aria-label="Lista de obrigações">', resumo + '<section class="card guiaslista" aria-label="Lista de obrigações">');
+  h = h.replace(/<button class="btn soft sm" data-action="pagar" data-id="([^"]+)">Marcar pago<\/button>/g, '<button class="btn primary sm" data-action="abrir-pagamento" data-id="$1">Como pagar</button><button class="btn soft sm" data-action="pagar" data-id="$1">Marcar pago</button>');
+  return h;
+};
+
+/* ---------- Tema escuro ---------- */
+function temaAtual(){ let v = 'auto'; try { v = localStorage.getItem('ff-tema') || 'auto'; } catch (e) {} return v; }
+function aplicarTema(v){
+  const escuro = v === 'escuro' || (v === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
+}
+aplicarTema(temaAtual());
+try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (temaAtual() === 'auto') aplicarTema('auto'); }); } catch (e) {}
+ACT['tema'] = el => { try { localStorage.setItem('ff-tema', el.dataset.v); } catch (e) {} aplicarTema(el.dataset.v); renderAll(); };
+const _pgCfg = pgCfg;
+pgCfg = function(){
+  const v = temaAtual();
+  const seg = [['claro', 'Claro'], ['escuro', 'Escuro'], ['auto', 'Automático']].map(x => '<button data-action="tema" data-v="' + x[0] + '" aria-pressed="' + (v === x[0]) + '">' + x[1] + '</button>').join('');
+  const card = sec('ctema', 'Aparência', '<p class="sub" style="margin:0 0 10px">Escolha o tema da tela. "Automático" segue o seu aparelho.</p><div class="seg" role="group" aria-label="Tema">' + seg + '</div>');
+  return _pgCfg().replace('<div class="cfggrid">', '<div class="cfggrid">' + card);
+};
 
 route();
 boot();

@@ -845,6 +845,11 @@ function renderModal(){
       '<li class="step"><span class="sn">3</span><div><b>Falar com o contador</b><p class="hint">Vale muito a pena se os valores forem altos, se houver dúvida sobre qual guia emitir ou se a empresa corre risco de ser excluída do Simples.</p></div></li></ol>' +
       '<div class="actions" style="justify-content:flex-start"><a class="btn primary" href="https://www8.receita.fazenda.gov.br/simplesnacional/" target="_blank" rel="noopener">Abrir o Simples Nacional</a><a class="btn ghost" href="https://cav.receita.fazenda.gov.br/" target="_blank" rel="noopener">Abrir o e-CAC (parcelamento)</a></div>' +
       '<p class="hint">Este texto é um guia geral, não é orientação contábil. Os valores atualizados e as regras de parcelamento só a Receita informa.</p>';
+  } else if (m.t === 'sair') {
+    title = 'Sair do sistema?';
+    body = '<p class="sub" style="margin:0 0 10px">Você usa o FiscoFácil <b>sem cadastro</b>: este navegador é a chave dos seus dados. Se sair agora, você <b>não consegue voltar</b> às empresas, guias e notas que já cadastrou.</p>' +
+      '<p class="sub" style="margin:0 0 14px">Para poder sair e entrar de qualquer aparelho, crie antes um e-mail e uma senha em Configurações.</p>' +
+      '<div class="actions"><button class="btn ghost" data-action="fechar">Cancelar</button><button class="btn primary" data-action="ir-config">Criar e-mail e senha</button><button class="btn danger" data-action="sair-ok">Sair mesmo assim</button></div>';
   } else if (m.t === 'novaemp') {
     title = 'Adicionar empresa';
     body = '<form id="formNovaEmp" class="form">' + field('mnome', 'Nome da empresa', '<input id="mnome" class="in" autocomplete="off" autofocus>') +
