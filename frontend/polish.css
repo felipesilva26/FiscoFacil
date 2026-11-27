@@ -433,3 +433,4 @@ button.pt{cursor:pointer}button.pt:hover b{text-decoration:underline}
 :root[data-theme=dark] a:not(.avatar){color:var(--brand-text)}
 :root[data-theme=dark] .nav a,:root[data-theme=dark] .sairbtn{color:var(--side-ink)}
 :root[data-theme=dark] .nav a[aria-current="page"]{color:#fff}
+.car.noprev .carnav.prev,.car.nonext .carnav.next{display:none}

@@ -771,6 +771,7 @@ button.pt{cursor:pointer}button.pt:hover b{text-decoration:underline}
 :root[data-theme=dark] a:not(.avatar){color:var(--brand-text)}
 :root[data-theme=dark] .nav a,:root[data-theme=dark] .sairbtn{color:var(--side-ink)}
 :root[data-theme=dark] .nav a[aria-current="page"]{color:#fff}
+.car.noprev .carnav.prev,.car.nonext .carnav.next{display:none}
 
 </style>
 
@@ -2396,6 +2397,9 @@ function painelAvisos(){
   document.addEventListener('pointerup', fim); document.addEventListener('pointercancel', fim);
   document.addEventListener('click', e => { if (moveu) { e.stopPropagation(); e.preventDefault(); moveu = false; } }, true);
   const rolar = (b, dir) => { const c = b.parentNode.querySelector('[data-car]'); if (c) c.scrollBy({left:dir * Math.max(240, c.clientWidth * .7), behavior:'smooth'}); };
+  const setas = () => document.querySelectorAll('.car').forEach(w => { const c = w.querySelector('[data-car]'); if (!c) return; w.classList.toggle('noprev', c.scrollLeft < 8); w.classList.toggle('nonext', c.scrollLeft + c.clientWidth >= c.scrollWidth - 8); });
+  document.addEventListener('scroll', setas, true); window.addEventListener('resize', setas);
+  try { new MutationObserver(() => setTimeout(setas, 0)).observe(document.body, {childList:true, subtree:true}); } catch (e) {}
   ACT['car-prev'] = el => rolar(el, -1); ACT['car-next'] = el => rolar(el, 1);
 })();
 ACT['sair-ok'] = () => { closeModal(); logout(); };
